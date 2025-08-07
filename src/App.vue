@@ -1,18 +1,9 @@
 <template>
   <div class="game-container">
     <div class="piece-area">
-      <div 
-        v-if="currentPiece"
-        class="draggable-piece"
-        :draggable="true"
-        @dragstart="handleDragStart"
-        @dragend="handleDragEnd"
-      >
-        <img 
-          :src="getPieceImage(currentPiece)" 
-          :alt="currentPiece.type"
-          class="chess-piece-large"
-        />
+      <div v-if="gameStarted && currentPuzzle" class="puzzle-instructions">
+        <h2>Capture the enemy pieces!</h2>
+        <p>Drag your {{ getPieceName(currentPiece) }} to capture the highlighted enemies</p>
       </div>
       <div v-if="!gameStarted" class="start-message">
         <button @click="startGame" class="start-button">
@@ -26,6 +17,10 @@
         v-if="gameStarted"
         :validSquares="validSquares"
         :kingPosition="kingPosition"
+        :piecePosition="currentPuzzle?.piecePosition || ''"
+        :boardDimensions="currentPuzzle?.boardDimensions || { cols: 3, rows: 3 }"
+        :enemyPieces="currentPuzzle?.enemyPieces || []"
+        :playerPiece="currentPiece"
         @square-drop="handleSquareDrop"
         :isDragging="isDragging"
       />
@@ -35,6 +30,7 @@
       <div class="score">Score: {{ score }}</div>
       <div class="streak">Streak: {{ streak }}</div>
       <div class="level">Level: {{ currentLevel }}</div>
+      <div v-if="currentPiece" class="piece-info">{{ getPieceName(currentPiece) }}</div>
     </div>
     
     <transition name="feedback">
@@ -50,7 +46,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { Chess } from 'chess.js'
 import confetti from 'canvas-confetti'
 import ChessBoard from './components/ChessBoard.vue'
@@ -71,6 +67,18 @@ const showSuccess = ref(false)
 const showError = ref(false)
 const currentLevel = ref(1)
 const currentPuzzle = ref(null)
+
+const getPieceName = (piece) => {
+  if (!piece) return ''
+  const names = {
+    'q': 'Queen',
+    'r': 'Rook', 
+    'b': 'Bishop',
+    'n': 'Knight',
+    'p': 'Pawn'
+  }
+  return names[piece.type] || ''
+}
 
 const getPieceImage = (piece) => {
   if (!piece) return ''
@@ -101,11 +109,14 @@ const nextPuzzle = () => {
   kingPosition.value = currentPuzzle.value.kingPosition
 }
 
+// Make the piece on board draggable
 const handleDragStart = (e) => {
-  isDragging.value = true
-  playPickup()
-  e.dataTransfer.effectAllowed = 'move'
-  e.dataTransfer.setData('piece', JSON.stringify(currentPiece.value))
+  if (e.target.classList.contains('player-piece')) {
+    isDragging.value = true
+    playPickup()
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('piece', JSON.stringify(currentPiece.value))
+  }
 }
 
 const handleDragEnd = () => {
@@ -115,7 +126,8 @@ const handleDragEnd = () => {
 const handleSquareDrop = (square) => {
   playDrop()
   
-  if (currentPuzzle.value.solution === square) {
+  // Check if the square is a valid move for this piece
+  if (currentPuzzle.value.allValidMoves && currentPuzzle.value.allValidMoves.includes(square)) {
     handleSuccess()
   } else {
     handleError()
@@ -137,8 +149,9 @@ const handleSuccess = () => {
   
   setTimeout(() => {
     showSuccess.value = false
-    if (streak.value > 0 && streak.value % 5 === 0) {
-      currentLevel.value = Math.min(currentLevel.value + 1, 3)
+    // Progress to next level every 3 correct answers
+    if (streak.value > 0 && streak.value % 3 === 0) {
+      currentLevel.value = Math.min(currentLevel.value + 1, 10)
     }
     nextPuzzle()
   }, 2000)
@@ -157,6 +170,14 @@ const handleError = () => {
 
 onMounted(() => {
   loadScore()
+  // Add event listeners for drag on board pieces
+  document.addEventListener('dragstart', handleDragStart)
+  document.addEventListener('dragend', handleDragEnd)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('dragstart', handleDragStart)
+  document.removeEventListener('dragend', handleDragEnd)
 })
 </script>
 
@@ -169,7 +190,7 @@ onMounted(() => {
 }
 
 .piece-area {
-  height: 45vh;
+  height: 25vh;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -198,7 +219,7 @@ onMounted(() => {
 }
 
 .board-area {
-  height: 45vh;
+  height: 65vh;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -219,12 +240,17 @@ onMounted(() => {
   color: #2d3748;
 }
 
-.score, .streak, .level {
+.score, .streak, .level, .piece-info {
   padding: 10px 20px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border-radius: 20px;
   box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.piece-info {
+  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+  font-size: 28px;
 }
 
 .start-message {
@@ -245,6 +271,22 @@ onMounted(() => {
 
 .start-button:hover {
   transform: scale(1.05);
+}
+
+.puzzle-instructions {
+  text-align: center;
+  color: #2d3748;
+}
+
+.puzzle-instructions h2 {
+  font-size: 32px;
+  margin-bottom: 10px;
+  color: #764ba2;
+}
+
+.puzzle-instructions p {
+  font-size: 20px;
+  color: #4a5568;
 }
 
 .success-overlay {

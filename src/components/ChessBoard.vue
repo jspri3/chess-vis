@@ -15,15 +15,18 @@
         @dragenter.prevent
       >
         <img 
-          v-if="isKingPosition(rowIndex, colIndex)"
-          :src="getKingImage()"
-          alt="King"
-          class="chess-piece"
+          v-if="isPieceStartPosition(rowIndex, colIndex) && playerPiece"
+          :src="getPieceImage(playerPiece)"
+          :alt="playerPiece.type"
+          class="chess-piece player-piece"
+          :draggable="true"
         />
-        <div 
-          v-if="isValidSquare(rowIndex, colIndex) && isDragging"
-          class="drop-indicator"
-        ></div>
+        <img 
+          v-if="hasEnemyPiece(rowIndex, colIndex)"
+          :src="getEnemyImage()"
+          alt="Enemy"
+          class="chess-piece enemy-piece"
+        />
       </div>
     </div>
   </div>
@@ -43,9 +46,25 @@ const props = defineProps({
     required: true,
     default: ''
   },
+  piecePosition: {
+    type: String,
+    default: ''
+  },
   isDragging: {
     type: Boolean,
     default: false
+  },
+  boardDimensions: {
+    type: Object,
+    default: () => ({ cols: 8, rows: 4 })
+  },
+  enemyPieces: {
+    type: Array,
+    default: () => []
+  },
+  playerPiece: {
+    type: Object,
+    default: null
   }
 })
 
@@ -53,9 +72,10 @@ const emit = defineEmits(['square-drop'])
 
 const board = computed(() => {
   const boardArray = []
-  for (let i = 0; i < 4; i++) {
+  const { rows, cols } = props.boardDimensions
+  for (let i = 0; i < rows; i++) {
     const row = []
-    for (let j = 0; j < 8; j++) {
+    for (let j = 0; j < cols; j++) {
       row.push(null)
     }
     boardArray.push(row)
@@ -64,41 +84,67 @@ const board = computed(() => {
 })
 
 const getSquareNotation = (row, col) => {
-  const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
-  const rank = 4 - row
+  const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].slice(0, props.boardDimensions.cols)
+  const { rows } = props.boardDimensions
+  const rank = rows - row
   return `${files[col]}${rank}`
 }
 
 const getSquareClass = (row, col) => {
   const square = getSquareNotation(row, col)
   const isValid = props.validSquares.includes(square)
-  const isKing = square === props.kingPosition
+  const isStart = square === props.piecePosition
+  const hasEnemy = props.enemyPieces.some(enemy => enemy.square === square)
+  const isCapturableEnemy = props.enemyPieces.some(enemy => enemy.square === square && enemy.capturable)
   const isDark = (row + col) % 2 === 1
   
   return {
     'board-square': true,
     'square-dark': isDark,
     'square-light': !isDark,
-    'square-valid': isValid && !isKing,
-    'square-invalid': !isValid && !isKing,
-    'square-king': isKing,
-    'square-hoverable': isValid && props.isDragging
+    'square-valid': isCapturableEnemy,
+    'square-invalid': hasEnemy && !isCapturableEnemy,
+    'square-start': isStart,
+    'square-enemy': hasEnemy,
+    'square-capturable': isCapturableEnemy,
+    'square-hoverable': isCapturableEnemy && props.isDragging
   }
 }
 
 const isValidSquare = (row, col) => {
   const square = getSquareNotation(row, col)
-  return props.validSquares.includes(square) && square !== props.kingPosition
+  return props.validSquares.includes(square)
 }
 
-const isKingPosition = (row, col) => {
+const hasEnemyPiece = (row, col) => {
   const square = getSquareNotation(row, col)
-  return square === props.kingPosition
+  return props.enemyPieces.some(enemy => enemy.square === square)
 }
 
-const getKingImage = () => {
+const isPieceStartPosition = (row, col) => {
+  const square = getSquareNotation(row, col)
+  return square === props.piecePosition
+}
+
+const getPieceImage = (piece) => {
+  if (!piece) return ''
+  const color = piece.color === 'w' ? 'White' : 'Black'
+  const typeMap = {
+    'q': 'Queen',
+    'r': 'Rook',
+    'b': 'Bishop',
+    'n': 'Knight',
+    'p': 'Pawn',
+    'k': 'King'
+  }
+  const pieceName = typeMap[piece.type]
   const base = import.meta.env.BASE_URL
-  return `${base}assets/Piece=King, Side=Black.png`
+  return `${base}assets/Piece=${pieceName}, Side=${color}.png`
+}
+
+const getEnemyImage = () => {
+  const base = import.meta.env.BASE_URL
+  return `${base}assets/Piece=Pawn, Side=Black.png`
 }
 
 const handleDragOver = (e) => {
@@ -129,8 +175,8 @@ const handleDrop = (e, row, col) => {
 }
 
 .board-square {
-  width: 90px;
-  height: 90px;
+  width: 100px;
+  height: 100px;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -155,29 +201,65 @@ const handleDrop = (e, row, col) => {
   position: relative;
 }
 
-.square-valid::after {
+.square-capturable {
+  position: relative;
+}
+
+.square-capturable::after {
   content: '';
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 30px;
-  height: 30px;
-  background-color: rgba(72, 187, 120, 0.5);
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(239, 68, 68, 0.8);
   border-radius: 50%;
   pointer-events: none;
+  animation: pulse-red 1.5s infinite;
+}
+
+@keyframes pulse-red {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.2);
+    opacity: 0.4;
+  }
 }
 
 .square-hoverable:hover {
-  background-color: rgba(72, 187, 120, 0.3) !important;
+  background-color: rgba(239, 68, 68, 0.2) !important;
   transform: scale(1.05);
   z-index: 1;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.4);
+  cursor: pointer;
 }
 
 .square-king {
   background-color: #ffd700 !important;
   animation: pulse 2s infinite;
+}
+
+.square-start {
+  background-color: #a0d2ff !important;
+  position: relative;
+}
+
+.start-position-marker {
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  font-weight: bold;
+  color: #1a365d;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 2px 6px;
+  border-radius: 4px;
+  z-index: 3;
 }
 
 .chess-piece {
@@ -187,16 +269,23 @@ const handleDrop = (e, row, col) => {
   filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
 }
 
-.drop-indicator {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 60px;
-  height: 60px;
-  border: 4px dashed #48bb78;
-  border-radius: 50%;
-  animation: rotate 2s linear infinite;
+.player-piece {
+  z-index: 3;
+  cursor: grab;
+  transition: transform 0.2s;
+}
+
+.player-piece:hover {
+  transform: scale(1.1);
+}
+
+.player-piece:active {
+  cursor: grabbing;
+  transform: scale(1.15);
+}
+
+.enemy-piece {
+  opacity: 0.9;
 }
 
 @keyframes pulse {
@@ -205,15 +294,6 @@ const handleDrop = (e, row, col) => {
   }
   50% {
     opacity: 0.8;
-  }
-}
-
-@keyframes rotate {
-  from {
-    transform: translate(-50%, -50%) rotate(0deg);
-  }
-  to {
-    transform: translate(-50%, -50%) rotate(360deg);
   }
 }
 </style>
