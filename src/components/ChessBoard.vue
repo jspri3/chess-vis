@@ -22,6 +22,9 @@
           @dragstart="handlePieceDragStart"
           @dragend="handlePieceDragEnd"
           @mousedown="handleMouseDown"
+          @touchstart="handleTouchStart"
+          @touchmove="handleTouchMove"
+          @touchend="handleTouchEnd"
         >
           <img 
             :src="getPieceImage(playerPiece)"
@@ -165,14 +168,80 @@ const handleDragOver = (e) => {
   e.dataTransfer.dropEffect = 'move'
 }
 
+// Track touch state for mobile drag
+let touchItem = null
+let touchOffset = { x: 0, y: 0 }
+let dragElement = null
+
 const handlePieceClick = (e) => {
   console.log('Piece clicked!', e.target)
 }
 
 const handleMouseDown = (e) => {
   console.log('Mouse down on piece', e.target)
-  // Prevent default to ensure drag works
-  // e.preventDefault() // Don't prevent default as it might block drag
+}
+
+const handleTouchStart = (e) => {
+  console.log('Touch start on piece')
+  const touch = e.touches[0]
+  const target = e.currentTarget
+  
+  // Store the initial touch position
+  const rect = target.getBoundingClientRect()
+  touchOffset.x = touch.clientX - rect.left
+  touchOffset.y = touch.clientY - rect.top
+  
+  // Create a dragging element
+  dragElement = target.cloneNode(true)
+  dragElement.style.position = 'fixed'
+  dragElement.style.zIndex = '1000'
+  dragElement.style.opacity = '0.8'
+  dragElement.style.pointerEvents = 'none'
+  dragElement.style.width = rect.width + 'px'
+  dragElement.style.height = rect.height + 'px'
+  document.body.appendChild(dragElement)
+  
+  // Start dragging
+  emit('piece-drag-start', e)
+  target.style.opacity = '0.3'
+}
+
+const handleTouchMove = (e) => {
+  e.preventDefault() // Prevent scrolling
+  
+  if (dragElement) {
+    const touch = e.touches[0]
+    dragElement.style.left = (touch.clientX - touchOffset.x) + 'px'
+    dragElement.style.top = (touch.clientY - touchOffset.y) + 'px'
+  }
+}
+
+const handleTouchEnd = (e) => {
+  console.log('Touch end')
+  
+  if (dragElement) {
+    // Get the element under the touch point
+    const touch = e.changedTouches[0]
+    dragElement.style.display = 'none'
+    const elementBelow = document.elementFromPoint(touch.clientX, touch.clientY)
+    dragElement.style.display = ''
+    
+    // Clean up drag element
+    document.body.removeChild(dragElement)
+    dragElement = null
+    
+    // Reset opacity
+    e.currentTarget.style.opacity = '1'
+    
+    // Check if dropped on a valid square
+    if (elementBelow && elementBelow.classList.contains('board-square')) {
+      const square = elementBelow.dataset.square
+      console.log('Dropped on square:', square)
+      emit('square-drop', square)
+    }
+    
+    emit('piece-drag-end', e)
+  }
 }
 
 const handlePieceDragStart = (e) => {
@@ -222,8 +291,8 @@ const handleDrop = (e, row, col) => {
 }
 
 .board-square {
-  width: 120px;
-  height: 120px;
+  width: min(15vw, 15vh, 120px);
+  height: min(15vw, 15vh, 120px);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -231,18 +300,18 @@ const handleDrop = (e, row, col) => {
   transition: all 0.2s;
 }
 
-/* Responsive sizing for different board dimensions */
-@media (max-height: 800px) {
+/* Mobile responsive sizing */
+@media (max-width: 768px) {
   .board-square {
-    width: 100px;
-    height: 100px;
+    width: min(25vw, 12vh, 80px);
+    height: min(25vw, 12vh, 80px);
   }
 }
 
-@media (max-height: 700px) {
+@media (max-width: 480px) {
   .board-square {
-    width: 80px;
-    height: 80px;
+    width: min(28vw, 10vh, 70px);
+    height: min(28vw, 10vh, 70px);
   }
 }
 
@@ -327,13 +396,15 @@ const handleDrop = (e, row, col) => {
 .piece-container {
   width: 80%;
   height: 80%;
-  max-width: 90px;
-  max-height: 90px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: grab;
   z-index: 3;
+  touch-action: none; /* Important for touch events */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .piece-container:active {

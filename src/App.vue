@@ -243,20 +243,24 @@ onUnmounted(() => {
 
 <style scoped>
 .game-container {
+  min-height: 100vh;
   height: 100vh;
   display: flex;
   flex-direction: column;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  overflow: hidden;
 }
 
 .piece-area {
-  height: 20vh;
+  height: 15vh;
+  min-height: 80px;
   display: flex;
   justify-content: center;
   align-items: center;
   background: rgba(255, 255, 255, 0.95);
   border-bottom: 4px solid #4a5568;
   position: relative;
+  padding: 10px;
 }
 
 .draggable-piece {
@@ -279,39 +283,65 @@ onUnmounted(() => {
 }
 
 .board-area {
-  height: 70vh;
+  flex: 1;
   display: flex;
   justify-content: center;
   align-items: center;
   padding: 10px;
   background: rgba(255, 255, 255, 0.9);
   overflow: auto;
+  min-height: 0;
 }
 
 .score-area {
   height: 10vh;
+  min-height: 60px;
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 40px;
+  gap: 10px;
   background: rgba(255, 255, 255, 0.95);
   border-top: 4px solid #4a5568;
-  font-size: 24px;
+  font-size: 16px;
   font-weight: bold;
   color: #2d3748;
+  flex-wrap: wrap;
+  padding: 5px;
+}
+
+@media (min-width: 768px) {
+  .score-area {
+    font-size: 24px;
+    gap: 40px;
+  }
 }
 
 .score, .streak, .level, .piece-info {
-  padding: 10px 20px;
+  padding: 5px 10px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
-  border-radius: 20px;
+  border-radius: 15px;
   box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+  font-size: 14px;
+}
+
+@media (min-width: 768px) {
+  .score, .streak, .level, .piece-info {
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-size: inherit;
+  }
 }
 
 .piece-info {
   background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
-  font-size: 28px;
+  font-size: 16px;
+}
+
+@media (min-width: 768px) {
+  .piece-info {
+    font-size: 28px;
+  }
 }
 
 .start-message {
@@ -400,14 +430,25 @@ onUnmounted(() => {
 }
 
 .puzzle-instructions h2 {
-  font-size: 32px;
-  margin-bottom: 10px;
+  font-size: 20px;
+  margin-bottom: 5px;
   color: #764ba2;
 }
 
 .puzzle-instructions p {
-  font-size: 20px;
+  font-size: 14px;
   color: #4a5568;
+}
+
+@media (min-width: 768px) {
+  .puzzle-instructions h2 {
+    font-size: 32px;
+    margin-bottom: 10px;
+  }
+  
+  .puzzle-instructions p {
+    font-size: 20px;
+  }
 }
 
 /* Global dragging styles */
