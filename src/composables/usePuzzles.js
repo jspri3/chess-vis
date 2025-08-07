@@ -15,19 +15,29 @@ export function usePuzzles() {
     const { cols, rows } = boardDimensions
     
     // For 3x3 board, use simpler pieces
-    let pieces = ['r', 'b', 'n'] // Start with rook, bishop, knight
-    if (level > 2) pieces.push('q') // Add queen at level 3
-    if (level > 4) pieces.push('p') // Add pawn at level 5
+    let pieces = ['r', 'b'] // Start with rook and bishop only for 3x3
+    if (cols > 3) pieces.push('n') // Add knight for 4x4 and larger
+    if (level > 3) pieces.push('q') // Add queen at level 4
+    if (level > 5) pieces.push('p') // Add pawn at level 6
     
     const pieceType = pieces[Math.floor(Math.random() * pieces.length)]
     
     const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].slice(0, cols)
     const ranks = ['1', '2', '3', '4'].slice(0, rows)
     
-    // Place the player's piece in center for 3x3, or randomly for larger boards
+    // Place the player's piece appropriately
     let piecePosition
     if (cols === 3 && rows === 3) {
-      piecePosition = 'b2' // Center of 3x3 board
+      // For 3x3, avoid knight (can't move properly)
+      // Place rook/bishop in corner or edge for better moves
+      if (pieceType === 'r') {
+        // Rook works well on edges
+        const positions = ['a2', 'b1', 'b3', 'c2']
+        piecePosition = positions[Math.floor(Math.random() * positions.length)]
+      } else {
+        // Bishop works from center
+        piecePosition = 'b2'
+      }
     } else if (cols === 4 && rows === 4) {
       // Place near center for 4x4
       const centerPositions = ['b2', 'b3', 'c2', 'c3']
@@ -59,9 +69,9 @@ export function usePuzzles() {
     allSquares.sort(() => Math.random() - 0.5)
     
     // Determine number of enemy pieces based on level
-    let numEnemies = Math.min(3 + Math.floor(level / 2), allSquares.length)
+    let numEnemies = Math.min(2 + Math.floor(level / 2), allSquares.length)
     if (cols === 3 && rows === 3) {
-      numEnemies = Math.min(3, allSquares.length)
+      numEnemies = Math.min(2, allSquares.length) // Start with just 2 enemies for 3x3
     }
     
     // Place enemy pieces

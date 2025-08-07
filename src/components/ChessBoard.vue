@@ -168,6 +168,8 @@ const handleDrop = (e, row, col) => {
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  transform: scale(1);
+  transition: transform 0.3s;
 }
 
 .board-row {
@@ -175,13 +177,28 @@ const handleDrop = (e, row, col) => {
 }
 
 .board-square {
-  width: 100px;
-  height: 100px;
+  width: 120px;
+  height: 120px;
   display: flex;
   justify-content: center;
   align-items: center;
   position: relative;
   transition: all 0.2s;
+}
+
+/* Responsive sizing for different board dimensions */
+@media (max-height: 800px) {
+  .board-square {
+    width: 100px;
+    height: 100px;
+  }
+}
+
+@media (max-height: 700px) {
+  .board-square {
+    width: 80px;
+    height: 80px;
+  }
 }
 
 .square-light {
@@ -263,16 +280,19 @@ const handleDrop = (e, row, col) => {
 }
 
 .chess-piece {
-  width: 70px;
-  height: 70px;
+  width: 80%;
+  height: 80%;
+  max-width: 90px;
+  max-height: 90px;
   z-index: 2;
   filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+  transition: opacity 0.2s;
 }
 
 .player-piece {
   z-index: 3;
   cursor: grab;
-  transition: transform 0.2s;
+  transition: transform 0.2s, opacity 0.2s;
 }
 
 .player-piece:hover {
@@ -282,6 +302,11 @@ const handleDrop = (e, row, col) => {
 .player-piece:active {
   cursor: grabbing;
   transform: scale(1.15);
+}
+
+.player-piece.dragging {
+  opacity: 0.3;
+  transform: scale(0.9);
 }
 
 .enemy-piece {

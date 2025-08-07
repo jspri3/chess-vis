@@ -24,6 +24,29 @@
         @square-drop="handleSquareDrop"
         :isDragging="isDragging"
       />
+      <div v-else class="start-board">
+        <div class="start-screen-content">
+          <div class="decorative-board">
+            <div v-for="row in 4" :key="row" class="board-row">
+              <div 
+                v-for="col in 4" 
+                :key="`${row}-${col}`"
+                :class="['decorative-square', (row + col) % 2 === 0 ? 'light' : 'dark']"
+              ></div>
+            </div>
+          </div>
+          <div class="dancing-pieces-overlay">
+            <img 
+              v-for="(piece, index) in startScreenPieces" 
+              :key="index"
+              :src="piece.src"
+              :class="['dancing-piece', piece.animation]"
+              :style="{ animationDelay: piece.delay }"
+              alt="Chess piece"
+            />
+          </div>
+        </div>
+      </div>
     </div>
     
     <div class="score-area">
@@ -68,6 +91,16 @@ const showError = ref(false)
 const currentLevel = ref(1)
 const currentPuzzle = ref(null)
 
+// Start screen animated pieces
+const startScreenPieces = ref([
+  { src: `${import.meta.env.BASE_URL}assets/Piece=King, Side=White.png`, animation: 'bounce', delay: '0s' },
+  { src: `${import.meta.env.BASE_URL}assets/Piece=Queen, Side=Black.png`, animation: 'spin', delay: '0.2s' },
+  { src: `${import.meta.env.BASE_URL}assets/Piece=Rook, Side=White.png`, animation: 'slide', delay: '0.4s' },
+  { src: `${import.meta.env.BASE_URL}assets/Piece=Bishop, Side=Black.png`, animation: 'bounce', delay: '0.6s' },
+  { src: `${import.meta.env.BASE_URL}assets/Piece=Knight, Side=White.png`, animation: 'spin', delay: '0.8s' },
+  { src: `${import.meta.env.BASE_URL}assets/Piece=Pawn, Side=Black.png`, animation: 'slide', delay: '1s' }
+])
+
 const getPieceName = (piece) => {
   if (!piece) return ''
   const names = {
@@ -107,6 +140,8 @@ const nextPuzzle = () => {
   currentPiece.value = currentPuzzle.value.piece
   validSquares.value = currentPuzzle.value.validSquares
   kingPosition.value = currentPuzzle.value.kingPosition
+  console.log('Generated puzzle:', currentPuzzle.value)
+  console.log('Enemy pieces:', currentPuzzle.value.enemyPieces)
 }
 
 // Make the piece on board draggable
@@ -116,11 +151,37 @@ const handleDragStart = (e) => {
     playPickup()
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('piece', JSON.stringify(currentPiece.value))
+    
+    // Create a better drag image
+    const dragImage = new Image()
+    dragImage.src = e.target.src
+    dragImage.style.width = '80px'
+    dragImage.style.height = '80px'
+    
+    // Use the image as drag image
+    const canvas = document.createElement('canvas')
+    canvas.width = 80
+    canvas.height = 80
+    const ctx = canvas.getContext('2d')
+    
+    dragImage.onload = () => {
+      ctx.drawImage(dragImage, 0, 0, 80, 80)
+      e.dataTransfer.setDragImage(canvas, 40, 40)
+    }
+    
+    // Add dragging class to original piece
+    e.target.classList.add('dragging')
+    e.target.style.opacity = '0.3'
   }
 }
 
-const handleDragEnd = () => {
+const handleDragEnd = (e) => {
   isDragging.value = false
+  // Remove dragging class from piece
+  if (e.target && e.target.classList) {
+    e.target.classList.remove('dragging')
+    e.target.style.opacity = '1'
+  }
 }
 
 const handleSquareDrop = (square) => {
@@ -190,7 +251,7 @@ onUnmounted(() => {
 }
 
 .piece-area {
-  height: 25vh;
+  height: 20vh;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -219,12 +280,13 @@ onUnmounted(() => {
 }
 
 .board-area {
-  height: 65vh;
+  height: 70vh;
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 20px;
+  padding: 10px;
   background: rgba(255, 255, 255, 0.9);
+  overflow: auto;
 }
 
 .score-area {
@@ -273,6 +335,66 @@ onUnmounted(() => {
   transform: scale(1.05);
 }
 
+.dancing-pieces-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 25px;
+  z-index: 10;
+}
+
+.dancing-piece {
+  width: 70px;
+  height: 70px;
+  filter: drop-shadow(0 6px 12px rgba(0,0,0,0.4));
+}
+
+.dancing-piece.bounce {
+  animation: bounce-dance 2s ease-in-out infinite;
+}
+
+.dancing-piece.spin {
+  animation: spin-dance 3s linear infinite;
+}
+
+.dancing-piece.slide {
+  animation: slide-dance 2.5s ease-in-out infinite;
+}
+
+@keyframes bounce-dance {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+@keyframes spin-dance {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes slide-dance {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-10px);
+  }
+  75% {
+    transform: translateX(10px);
+  }
+}
+
 .puzzle-instructions {
   text-align: center;
   color: #2d3748;
@@ -287,6 +409,52 @@ onUnmounted(() => {
 .puzzle-instructions p {
   font-size: 20px;
   color: #4a5568;
+}
+
+/* Global dragging styles */
+:global(.dragging) {
+  opacity: 0.3 !important;
+}
+
+/* Start screen board */
+.start-board {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+}
+
+.start-screen-content {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.decorative-board {
+  border: 4px solid #2d3748;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  opacity: 0.5;
+}
+
+.decorative-board .board-row {
+  display: flex;
+}
+
+.decorative-square {
+  width: 80px;
+  height: 80px;
+}
+
+.decorative-square.light {
+  background-color: #f0d9b5;
+}
+
+.decorative-square.dark {
+  background-color: #b58863;
 }
 
 .success-overlay {
