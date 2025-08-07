@@ -14,13 +14,22 @@
         @drop="handleDrop($event, rowIndex, colIndex)"
         @dragenter.prevent
       >
-        <img 
+        <div 
           v-if="isPieceStartPosition(rowIndex, colIndex) && playerPiece"
-          :src="getPieceImage(playerPiece)"
-          :alt="playerPiece.type"
-          class="chess-piece player-piece"
-          :draggable="true"
-        />
+          class="piece-container"
+          draggable="true"
+          @click="handlePieceClick"
+          @dragstart="handlePieceDragStart"
+          @dragend="handlePieceDragEnd"
+          @mousedown="handleMouseDown"
+        >
+          <img 
+            :src="getPieceImage(playerPiece)"
+            :alt="playerPiece.type"
+            class="chess-piece player-piece"
+            draggable="false"
+          />
+        </div>
         <img 
           v-if="hasEnemyPiece(rowIndex, colIndex)"
           :src="getEnemyImage()"
@@ -68,7 +77,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['square-drop'])
+const emit = defineEmits(['square-drop', 'piece-drag-start', 'piece-drag-end'])
 
 const board = computed(() => {
   const boardArray = []
@@ -123,7 +132,11 @@ const hasEnemyPiece = (row, col) => {
 
 const isPieceStartPosition = (row, col) => {
   const square = getSquareNotation(row, col)
-  return square === props.piecePosition
+  const result = square === props.piecePosition
+  if (result) {
+    console.log('Piece is at position:', square)
+  }
+  return result
 }
 
 const getPieceImage = (piece) => {
@@ -152,12 +165,44 @@ const handleDragOver = (e) => {
   e.dataTransfer.dropEffect = 'move'
 }
 
+const handlePieceClick = (e) => {
+  console.log('Piece clicked!', e.target)
+}
+
+const handleMouseDown = (e) => {
+  console.log('Mouse down on piece', e.target)
+  // Prevent default to ensure drag works
+  // e.preventDefault() // Don't prevent default as it might block drag
+}
+
+const handlePieceDragStart = (e) => {
+  console.log('Piece drag start in ChessBoard', e)
+  e.dataTransfer.effectAllowed = 'move'
+  e.dataTransfer.setData('text/plain', 'dragging')
+  
+  // Set drag image to the piece image
+  const img = e.target.querySelector('img')
+  if (img) {
+    e.dataTransfer.setDragImage(img, 40, 40)
+  }
+  
+  emit('piece-drag-start', e)
+}
+
+const handlePieceDragEnd = (e) => {
+  console.log('Piece drag end in ChessBoard')
+  emit('piece-drag-end', e)
+}
+
 const handleDrop = (e, row, col) => {
   e.preventDefault()
   const square = getSquareNotation(row, col)
-  if (props.validSquares.includes(square)) {
-    emit('square-drop', square)
-  }
+  console.log('Drop event on square:', square)
+  console.log('Valid squares:', props.validSquares)
+  console.log('Is valid drop?', props.validSquares.includes(square))
+  
+  // Always emit the drop event, let parent handle validation
+  emit('square-drop', square)
 }
 </script>
 
@@ -279,20 +324,37 @@ const handleDrop = (e, row, col) => {
   z-index: 3;
 }
 
-.chess-piece {
+.piece-container {
   width: 80%;
   height: 80%;
   max-width: 90px;
   max-height: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  z-index: 3;
+}
+
+.piece-container:active {
+  cursor: grabbing;
+}
+
+.chess-piece {
+  width: 100%;
+  height: 100%;
   z-index: 2;
   filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
   transition: opacity 0.2s;
+  pointer-events: none;
 }
 
 .player-piece {
   z-index: 3;
   cursor: grab;
   transition: transform 0.2s, opacity 0.2s;
+  user-select: none;
+  -webkit-user-drag: element;
 }
 
 .player-piece:hover {

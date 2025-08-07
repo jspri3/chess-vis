@@ -22,6 +22,8 @@
         :enemyPieces="currentPuzzle?.enemyPieces || []"
         :playerPiece="currentPiece"
         @square-drop="handleSquareDrop"
+        @piece-drag-start="handlePieceDragStart"
+        @piece-drag-end="handlePieceDragEnd"
         :isDragging="isDragging"
       />
       <div v-else class="start-board">
@@ -144,53 +146,50 @@ const nextPuzzle = () => {
   console.log('Enemy pieces:', currentPuzzle.value.enemyPieces)
 }
 
-// Make the piece on board draggable
-const handleDragStart = (e) => {
-  if (e.target.classList.contains('player-piece')) {
-    isDragging.value = true
-    playPickup()
-    e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('piece', JSON.stringify(currentPiece.value))
-    
-    // Create a better drag image
-    const dragImage = new Image()
-    dragImage.src = e.target.src
-    dragImage.style.width = '80px'
-    dragImage.style.height = '80px'
-    
-    // Use the image as drag image
-    const canvas = document.createElement('canvas')
-    canvas.width = 80
-    canvas.height = 80
-    const ctx = canvas.getContext('2d')
-    
-    dragImage.onload = () => {
-      ctx.drawImage(dragImage, 0, 0, 80, 80)
-      e.dataTransfer.setDragImage(canvas, 40, 40)
-    }
-    
-    // Add dragging class to original piece
+// Handle piece drag events from ChessBoard
+const handlePieceDragStart = (e) => {
+  console.log('Piece drag start received in App')
+  isDragging.value = true
+  playPickup()
+  // Add dragging class to original piece
+  if (e.target) {
     e.target.classList.add('dragging')
     e.target.style.opacity = '0.3'
   }
 }
 
-const handleDragEnd = (e) => {
+const handlePieceDragEnd = (e) => {
+  console.log('Piece drag end received in App')
   isDragging.value = false
   // Remove dragging class from piece
-  if (e.target && e.target.classList) {
+  if (e.target) {
     e.target.classList.remove('dragging')
     e.target.style.opacity = '1'
   }
 }
 
+// Legacy drag handlers for backward compatibility
+const handleDragStart = (e) => {
+  console.log('Legacy drag start (should not be called)')
+  handlePieceDragStart(e)
+}
+
+const handleDragEnd = (e) => {
+  console.log('Legacy drag end (should not be called)')
+  handlePieceDragEnd(e)
+}
+
 const handleSquareDrop = (square) => {
+  console.log('Square drop triggered on:', square)
+  console.log('Valid moves:', currentPuzzle.value.allValidMoves)
   playDrop()
   
   // Check if the square is a valid move for this piece
   if (currentPuzzle.value.allValidMoves && currentPuzzle.value.allValidMoves.includes(square)) {
+    console.log('Valid move!')
     handleSuccess()
   } else {
+    console.log('Invalid move!')
     handleError()
   }
 }
