@@ -153,16 +153,14 @@ const getPieceImage = (piece) => {
 const startGame = () => {
   // Don't modify scores - just start/continue the game
   gameStarted.value = true
-  // Ensure scores are loaded but not cleared
-  if (score.value === 0 && streak.value === 0) {
-    // Only load if not already loaded
-    loadScore()
-  }
-  // Load saved level if exists
+  // Don't reload scores if they're already loaded
+  // The scores should persist from onMounted
+  
+  // Load saved level if not already loaded
   const savedState = localStorage.getItem('chessGameState')
   if (savedState) {
     const state = JSON.parse(savedState)
-    if (state.level) {
+    if (state.level && currentLevel.value === 1) {
       currentLevel.value = state.level
     }
   }
@@ -193,6 +191,12 @@ const newGame = () => {
 const goHome = () => {
   gameStarted.value = false
   saveGameState()
+  // Update hasActiveGame based on current progress
+  if (score.value > 0 || currentLevel.value > 1) {
+    hasActiveGame.value = true
+  } else {
+    hasActiveGame.value = false
+  }
 }
 
 const saveGameState = () => {
@@ -338,7 +342,7 @@ const handleSuccess = () => {
     }
     saveGameState() // Save progress
     nextPuzzle()
-  }, 2000)
+  }, 1000) // Reduced from 2000ms to 1000ms
 }
 
 const handleError = () => {

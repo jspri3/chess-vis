@@ -33,22 +33,28 @@ export function useScore() {
     const savedStreak = localStorage.getItem('chessStreak')
     const savedHighScore = localStorage.getItem('chessHighScore')
     
-    if (savedScore) {
+    // First check if we have the new format (separate keys)
+    if (savedScore !== null && !savedScore.startsWith('{')) {
+      // New format - direct numbers
+      score.value = parseInt(savedScore) || 0
+      streak.value = parseInt(savedStreak) || 0
+      highScore.value = parseInt(savedHighScore) || 0
+    } else if (savedScore) {
       try {
-        // Try to parse as JSON (old format)
+        // Old JSON format - parse and migrate
         const data = JSON.parse(savedScore)
         score.value = data.score || 0
         streak.value = data.streak || 0
         highScore.value = data.highScore || 0
-        // Migrate to new format
+        // Migrate to new format only once
         localStorage.setItem('chessScore', score.value.toString())
         localStorage.setItem('chessStreak', streak.value.toString())
         localStorage.setItem('chessHighScore', highScore.value.toString())
       } catch (e) {
-        // New format - direct number
-        score.value = parseInt(savedScore) || 0
-        streak.value = parseInt(savedStreak) || 0
-        highScore.value = parseInt(savedHighScore) || 0
+        // If parsing fails, initialize to 0
+        score.value = 0
+        streak.value = 0
+        highScore.value = 0
       }
     }
   }
