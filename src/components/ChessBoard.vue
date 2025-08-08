@@ -205,6 +205,11 @@ const handleSquareTouchEnd = (e, row, col) => {
   // Prevent default to avoid click events firing after touch
   e.preventDefault()
   
+  // Check if we're in touch mode
+  if (!isTouchDevice) {
+    return
+  }
+  
   // Only handle if this is not from a piece drag
   if (!isTouchDrag && !e.target.closest('.piece-container')) {
     const square = getSquareNotation(row, col)
@@ -270,7 +275,6 @@ const handleTouchMove = (e) => {
 }
 
 const handleTouchEnd = (e) => {
-  
   // Prevent this from bubbling to square touchend
   e.stopPropagation()
   
@@ -296,8 +300,11 @@ const handleTouchEnd = (e) => {
     
     emit('piece-drag-end', e)
   } else {
-    // It was a tap, not a drag
-    e.currentTarget.style.opacity = '1'
+    // It was a tap, not a drag - make sure opacity is reset
+    if (e.currentTarget) {
+      e.currentTarget.style.opacity = '1'
+    }
+    // Emit piece-select for tap
     emit('piece-select')
   }
   
@@ -397,7 +404,7 @@ const handleDrop = (e, row, col) => {
   .board-row:nth-child(3) .board-square:nth-child(4),
   .board-row:nth-child(4) .board-square:nth-child(4) {
     width: min(23vw, 15vh, 90px);
-    height: min(23vw, 15vh, 90px);
+    /* height removed to fix white square issue */
   }
 }
 

@@ -328,13 +328,15 @@ const handleError = () => {
   resetStreak()
   saveScore()
   
-  // Add error animation to the piece
-  const pieceElement = document.querySelector('.piece-container')
-  if (pieceElement) {
-    pieceElement.classList.add('error-shake')
-    setTimeout(() => {
-      pieceElement.classList.remove('error-shake')
-    }, 500)
+  // Add error animation to the piece only if piece exists
+  if (pieceSelected.value || isDragging.value) {
+    const pieceElement = document.querySelector('.piece-container')
+    if (pieceElement) {
+      pieceElement.classList.add('error-shake')
+      setTimeout(() => {
+        pieceElement.classList.remove('error-shake')
+      }, 500)
+    }
   }
 }
 
