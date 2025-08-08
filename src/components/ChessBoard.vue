@@ -146,9 +146,6 @@ const hasEnemyPiece = (row, col) => {
 const isPieceStartPosition = (row, col) => {
   const square = getSquareNotation(row, col)
   const result = square === props.piecePosition
-  if (result) {
-    console.log('Piece is at position:', square)
-  }
   return result
 }
 
@@ -191,7 +188,6 @@ const handlePieceClick = (e) => {
   if (isTouchDevice) {
     return
   }
-  console.log('Piece clicked!', e.target)
   e.stopPropagation() // Prevent square click
   emit('piece-select')
 }
@@ -202,7 +198,6 @@ const handleSquareClick = (e, row, col) => {
     return
   }
   const square = getSquareNotation(row, col)
-  console.log('Square clicked:', square)
   emit('square-click', square)
 }
 
@@ -213,7 +208,6 @@ const handleSquareTouchEnd = (e, row, col) => {
   // Only handle if this is not from a piece drag
   if (!isTouchDrag && !e.target.closest('.piece-container')) {
     const square = getSquareNotation(row, col)
-    console.log('Square touched:', square)
     emit('square-click', square)
   }
 }
@@ -221,14 +215,12 @@ const handleSquareTouchEnd = (e, row, col) => {
 const handleMouseDown = (e) => {
   // Mark as not touch device when mouse is used
   isTouchDevice = false
-  console.log('Mouse down on piece', e.target)
 }
 
 let touchStartPos = { x: 0, y: 0 }
 let isTouchDrag = false
 
 const handleTouchStart = (e) => {
-  console.log('Touch start on piece')
   isTouchDevice = true // Mark as touch device
   isTouchDrag = false
   
@@ -278,7 +270,6 @@ const handleTouchMove = (e) => {
 }
 
 const handleTouchEnd = (e) => {
-  console.log('Touch end, isTouchDrag:', isTouchDrag)
   
   // Prevent this from bubbling to square touchend
   e.stopPropagation()
@@ -300,14 +291,12 @@ const handleTouchEnd = (e) => {
     // Check if dropped on a valid square
     if (elementBelow && elementBelow.classList.contains('board-square')) {
       const square = elementBelow.dataset.square
-      console.log('Dropped on square:', square)
       emit('square-drop', square)
     }
     
     emit('piece-drag-end', e)
   } else {
     // It was a tap, not a drag
-    console.log('Touch was a tap, selecting piece')
     e.currentTarget.style.opacity = '1'
     emit('piece-select')
   }
@@ -316,7 +305,6 @@ const handleTouchEnd = (e) => {
 }
 
 const handlePieceDragStart = (e) => {
-  console.log('Piece drag start in ChessBoard', e)
   e.dataTransfer.effectAllowed = 'move'
   e.dataTransfer.setData('text/plain', 'dragging')
   
@@ -330,16 +318,12 @@ const handlePieceDragStart = (e) => {
 }
 
 const handlePieceDragEnd = (e) => {
-  console.log('Piece drag end in ChessBoard')
   emit('piece-drag-end', e)
 }
 
 const handleDrop = (e, row, col) => {
   e.preventDefault()
   const square = getSquareNotation(row, col)
-  console.log('Drop event on square:', square)
-  console.log('Valid squares:', props.validSquares)
-  console.log('Is valid drop?', props.validSquares.includes(square))
   
   // Always emit the drop event, let parent handle validation
   emit('square-drop', square)

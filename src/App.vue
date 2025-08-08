@@ -213,13 +213,10 @@ const nextPuzzle = () => {
   currentPiece.value = currentPuzzle.value.piece
   validSquares.value = currentPuzzle.value.validSquares
   kingPosition.value = currentPuzzle.value.kingPosition
-  console.log('Generated puzzle:', currentPuzzle.value)
-  console.log('Enemy pieces:', currentPuzzle.value.enemyPieces)
 }
 
 // Handle piece selection for tap-to-move
 const handlePieceSelect = () => {
-  console.log('Piece selected')
   pieceSelected.value = !pieceSelected.value
   if (pieceSelected.value) {
     playPickup()
@@ -227,10 +224,6 @@ const handlePieceSelect = () => {
 }
 
 const handleSquareClick = (square) => {
-  console.log('Square clicked in App:', square)
-  console.log('Piece selected?', pieceSelected.value)
-  console.log('Current puzzle valid moves:', currentPuzzle.value?.allValidMoves)
-  console.log('Current piece position:', currentPuzzle.value?.piecePosition)
   
   // Check if clicking on an enemy piece
   const isEnemySquare = currentPuzzle.value?.enemyPieces?.some(enemy => enemy.square === square)
@@ -241,30 +234,22 @@ const handleSquareClick = (square) => {
     
     if (square === currentPuzzle.value.piecePosition) {
       // Clicking on the piece again just deselects it
-      console.log('Piece deselected')
     } else if (currentPuzzle.value.allValidMoves && currentPuzzle.value.allValidMoves.includes(square)) {
       // Valid capture - make the move
-      console.log('Valid capture move to:', square)
       playDrop()
       handleSuccess()
     } else if (isEnemySquare) {
       // Clicked on non-capturable enemy - show error
-      console.log('Invalid enemy capture attempted:', square)
       handleError()
     } else {
       // Invalid empty square clicked
-      console.log('Invalid move attempted to:', square)
-      console.log('Valid moves were:', currentPuzzle.value.allValidMoves)
       handleError()
     }
-  } else {
-    console.log('No piece selected, ignoring square click')
   }
 }
 
 // Handle piece drag events from ChessBoard
 const handlePieceDragStart = (e) => {
-  console.log('Piece drag start received in App')
   isDragging.value = true
   pieceSelected.value = false // Cancel selection on drag
   playPickup()
@@ -276,7 +261,6 @@ const handlePieceDragStart = (e) => {
 }
 
 const handlePieceDragEnd = (e) => {
-  console.log('Piece drag end received in App')
   isDragging.value = false
   // Remove dragging class from piece
   if (e.target) {
@@ -287,29 +271,23 @@ const handlePieceDragEnd = (e) => {
 
 // Legacy drag handlers for backward compatibility
 const handleDragStart = (e) => {
-  console.log('Legacy drag start (should not be called)')
   handlePieceDragStart(e)
 }
 
 const handleDragEnd = (e) => {
-  console.log('Legacy drag end (should not be called)')
   handlePieceDragEnd(e)
 }
 
 const handleSquareDrop = (square) => {
-  console.log('Square drop triggered on:', square)
-  console.log('Valid moves:', currentPuzzle.value.allValidMoves)
   
   // Check if dropping on an enemy piece
   const isEnemySquare = currentPuzzle.value?.enemyPieces?.some(enemy => enemy.square === square)
   
   // Check if the square is a valid move for this piece
   if (currentPuzzle.value.allValidMoves && currentPuzzle.value.allValidMoves.includes(square)) {
-    console.log('Valid move!')
     playDrop()
     handleSuccess()
   } else {
-    console.log('Invalid move!')
     playDrop()
     handleError()
   }
@@ -378,10 +356,8 @@ onMounted(() => {
     // Check if there's an active game with progress
     if (score.value > 0 || currentLevel.value > 1) {
       hasActiveGame.value = true
-      console.log('Active game detected - Score:', score.value, 'Level:', currentLevel.value)
     } else {
       hasActiveGame.value = false
-      console.log('No active game - Score:', score.value, 'Level:', currentLevel.value)
     }
   })
   
