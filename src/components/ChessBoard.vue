@@ -14,6 +14,7 @@
         @drop="handleDrop($event, rowIndex, colIndex)"
         @dragenter.prevent
         @click="handleSquareClick($event, rowIndex, colIndex)"
+        @touchend="handleSquareTouchEnd($event, rowIndex, colIndex)"
       >
         <div 
           v-if="isPieceStartPosition(rowIndex, colIndex) && playerPiece"
@@ -23,7 +24,7 @@
           @dragstart="handlePieceDragStart"
           @dragend="handlePieceDragEnd"
           @mousedown="handleMouseDown"
-          @touchstart="handleTouchStart"
+          @touchstart.passive="handleTouchStart"
           @touchmove="handleTouchMove"
           @touchend="handleTouchEnd"
         >
@@ -180,18 +181,42 @@ let touchOffset = { x: 0, y: 0 }
 let dragElement = null
 
 const handlePieceClick = (e) => {
+  // Ignore click events on touch devices (they're handled by touch events)
+  if ('ontouchstart' in window) {
+    return
+  }
   console.log('Piece clicked!', e.target)
   e.stopPropagation() // Prevent square click
   emit('piece-select')
 }
 
 const handleSquareClick = (e, row, col) => {
+  // Ignore click events on touch devices (handled by touchend)
+  if ('ontouchstart' in window) {
+    return
+  }
   const square = getSquareNotation(row, col)
   console.log('Square clicked:', square)
   emit('square-click', square)
 }
 
+const handleSquareTouchEnd = (e, row, col) => {
+  // Prevent default to avoid click events firing after touch
+  e.preventDefault()
+  
+  // Only handle if this is not from a piece drag
+  if (!isTouchDrag && !e.target.closest('.piece-container')) {
+    const square = getSquareNotation(row, col)
+    console.log('Square touched:', square)
+    emit('square-click', square)
+  }
+}
+
 const handleMouseDown = (e) => {
+  // Ignore mouse events on touch devices
+  if ('ontouchstart' in window) {
+    return
+  }
   console.log('Mouse down on piece', e.target)
 }
 
@@ -249,6 +274,9 @@ const handleTouchMove = (e) => {
 
 const handleTouchEnd = (e) => {
   console.log('Touch end, isTouchDrag:', isTouchDrag)
+  
+  // Prevent this from bubbling to square touchend
+  e.stopPropagation()
   
   if (dragElement && isTouchDrag) {
     // Handle drag end
@@ -380,12 +408,12 @@ const handleDrop = (e, row, col) => {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 40px;
-  height: 40px;
-  border: 3px solid rgba(239, 68, 68, 0.8);
+  width: 30px;
+  height: 30px;
+  border: 2px solid rgba(239, 68, 68, 0.5);
   border-radius: 50%;
   pointer-events: none;
-  animation: pulse-red 1.5s infinite;
+  animation: pulse-red 2s infinite;
 }
 
 .square-selected {
@@ -396,11 +424,11 @@ const handleDrop = (e, row, col) => {
 @keyframes pulse-red {
   0%, 100% {
     transform: translate(-50%, -50%) scale(1);
-    opacity: 0.8;
+    opacity: 0.5;
   }
   50% {
-    transform: translate(-50%, -50%) scale(1.2);
-    opacity: 0.4;
+    transform: translate(-50%, -50%) scale(1.1);
+    opacity: 0.3;
   }
 }
 

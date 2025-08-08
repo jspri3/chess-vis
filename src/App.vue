@@ -161,18 +161,30 @@ const handlePieceSelect = () => {
 
 const handleSquareClick = (square) => {
   console.log('Square clicked in App:', square)
+  console.log('Piece selected?', pieceSelected.value)
+  console.log('Current puzzle valid moves:', currentPuzzle.value?.allValidMoves)
+  console.log('Current piece position:', currentPuzzle.value?.piecePosition)
   
-  // If piece is selected and this is a valid move, make the move
+  // If piece is selected, handle the move
   if (pieceSelected.value) {
-    if (currentPuzzle.value.allValidMoves && currentPuzzle.value.allValidMoves.includes(square)) {
-      console.log('Making move to:', square)
+    pieceSelected.value = false // Always deselect after clicking
+    
+    if (square === currentPuzzle.value.piecePosition) {
+      // Clicking on the piece again just deselects it
+      console.log('Piece deselected')
+    } else if (currentPuzzle.value.allValidMoves && currentPuzzle.value.allValidMoves.includes(square)) {
+      // Valid capture - make the move
+      console.log('Valid capture move to:', square)
       playDrop()
-      pieceSelected.value = false
-      handleSquareDrop(square)
-    } else if (square === currentPuzzle.value.piecePosition) {
-      // Clicking on the piece again deselects it
-      pieceSelected.value = false
+      handleSuccess()
+    } else {
+      // Invalid square clicked
+      console.log('Invalid move attempted to:', square)
+      console.log('Valid moves were:', currentPuzzle.value.allValidMoves)
+      handleError()
     }
+  } else {
+    console.log('No piece selected, ignoring square click')
   }
 }
 
