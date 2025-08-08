@@ -11,7 +11,7 @@
         </button>
         <div v-else class="game-options">
           <button @click="continueGame" class="start-button">
-            Continue
+            Start Game
           </button>
           <button @click="newGame" class="start-button">
             New
@@ -87,7 +87,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { Chess } from 'chess.js'
 import confetti from 'canvas-confetti'
 import ChessBoard from './components/ChessBoard.vue'
@@ -110,6 +110,7 @@ const currentLevel = ref(1)
 const currentPuzzle = ref(null)
 const pieceSelected = ref(false)
 const hasActiveGame = ref(false)
+const showNewButton = ref(false)
 
 // Start screen animated pieces
 const startScreenPieces = ref([
@@ -150,31 +151,40 @@ const getPieceImage = (piece) => {
 }
 
 const startGame = () => {
+  // Don't modify scores - just start/continue the game
   gameStarted.value = true
-  loadScore()
+  // Ensure scores are loaded but not cleared
+  if (score.value === 0 && streak.value === 0) {
+    // Only load if not already loaded
+    loadScore()
+  }
+  // Load saved level if exists
+  const savedState = localStorage.getItem('chessGameState')
+  if (savedState) {
+    const state = JSON.parse(savedState)
+    if (state.level) {
+      currentLevel.value = state.level
+    }
+  }
   nextPuzzle()
   saveGameState()
 }
 
 const continueGame = () => {
-  const savedState = localStorage.getItem('chessGameState')
-  if (savedState) {
-    const state = JSON.parse(savedState)
-    currentLevel.value = state.level || 1
-    gameStarted.value = true
-    loadScore()
-    nextPuzzle()
-  }
+  // Same as startGame - just continue playing
+  startGame()
 }
 
 const newGame = () => {
   // Clear all game data
   localStorage.removeItem('chessScore')
   localStorage.removeItem('chessStreak')
+  localStorage.removeItem('chessHighScore')
   localStorage.removeItem('chessGameState')
   score.value = 0
   streak.value = 0
   currentLevel.value = 1
+  saveScore() // Save the cleared scores
   gameStarted.value = true
   nextPuzzle()
   saveGameState()
@@ -307,6 +317,11 @@ const handleSuccess = () => {
   incrementScore()
   saveScore()
   
+  // Update showNewButton since we now have progress
+  if (score.value > 0 || currentLevel.value > 1) {
+    showNewButton.value = true
+  }
+  
   confetti({
     particleCount: 100,
     spread: 70,
@@ -342,16 +357,30 @@ const handleError = () => {
 }
 
 onMounted(() => {
-  loadScore()
-  // Check for saved game state
+  // Load saved level first
   const savedState = localStorage.getItem('chessGameState')
   if (savedState) {
     const state = JSON.parse(savedState)
-    hasActiveGame.value = state.hasActiveGame || false
     if (state.level) {
       currentLevel.value = state.level
     }
   }
+  
+  // Then load score
+  loadScore()
+  
+  // Use nextTick to ensure score is loaded before checking
+  nextTick(() => {
+    // Check if there's an active game with progress
+    if (score.value > 0 || currentLevel.value > 1) {
+      hasActiveGame.value = true
+      console.log('Active game detected - Score:', score.value, 'Level:', currentLevel.value)
+    } else {
+      hasActiveGame.value = false
+      console.log('No active game - Score:', score.value, 'Level:', currentLevel.value)
+    }
+  })
+  
   // Add event listeners for drag on board pieces
   document.addEventListener('dragstart', handleDragStart)
   document.addEventListener('dragend', handleDragEnd)
@@ -556,9 +585,14 @@ onUnmounted(() => {
 
 .game-options {
   display: flex;
-  flex-direction: column;
-  gap: 15px;
+  flex-direction: row;
+  gap: 20px;
   align-items: center;
+  justify-content: center;
+}
+
+.game-options .start-button {
+  min-width: 120px;
 }
 
 /* Removed separate button colors - using default purple gradient */
@@ -566,14 +600,24 @@ onUnmounted(() => {
 .game-controls {
   position: absolute;
   top: 50%;
-  left: 15px;
+  left: 10px;
   transform: translateY(-50%);
   z-index: 10;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* Desktop - move button more to the right */
+@media (min-width: 768px) {
+  .game-controls {
+    left: 60px;
+  }
 }
 
 .home-button {
-  width: 45px;
-  height: 45px;
+  width: 55px;
+  height: 55px;
   border-radius: 50%;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border: none;
@@ -591,12 +635,14 @@ onUnmounted(() => {
 }
 
 .home-button svg {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   stroke: white;
   stroke-width: 2;
   fill: none;
 }
+
+/* Removed new-game-small styles as button is not used in game mode */
 
 .dancing-pieces-overlay {
   position: absolute;

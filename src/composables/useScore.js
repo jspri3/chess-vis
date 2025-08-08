@@ -23,20 +23,33 @@ export function useScore() {
   }
   
   const saveScore = () => {
-    localStorage.setItem('chessScore', JSON.stringify({
-      score: score.value,
-      streak: streak.value,
-      highScore: highScore.value
-    }))
+    localStorage.setItem('chessScore', score.value.toString())
+    localStorage.setItem('chessStreak', streak.value.toString())
+    localStorage.setItem('chessHighScore', highScore.value.toString())
   }
   
   const loadScore = () => {
-    const saved = localStorage.getItem('chessScore')
-    if (saved) {
-      const data = JSON.parse(saved)
-      score.value = data.score || 0
-      streak.value = data.streak || 0
-      highScore.value = data.highScore || 0
+    const savedScore = localStorage.getItem('chessScore')
+    const savedStreak = localStorage.getItem('chessStreak')
+    const savedHighScore = localStorage.getItem('chessHighScore')
+    
+    if (savedScore) {
+      try {
+        // Try to parse as JSON (old format)
+        const data = JSON.parse(savedScore)
+        score.value = data.score || 0
+        streak.value = data.streak || 0
+        highScore.value = data.highScore || 0
+        // Migrate to new format
+        localStorage.setItem('chessScore', score.value.toString())
+        localStorage.setItem('chessStreak', streak.value.toString())
+        localStorage.setItem('chessHighScore', highScore.value.toString())
+      } catch (e) {
+        // New format - direct number
+        score.value = parseInt(savedScore) || 0
+        streak.value = parseInt(savedStreak) || 0
+        highScore.value = parseInt(savedHighScore) || 0
+      }
     }
   }
   
