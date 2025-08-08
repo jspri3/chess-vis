@@ -6,8 +6,23 @@
         <p>Drag your {{ getPieceName(currentPiece) }} to capture the highlighted enemies</p>
       </div>
       <div v-if="!gameStarted" class="start-message">
-        <button @click="startGame" class="start-button">
+        <button v-if="!hasActiveGame" @click="startGame" class="start-button">
           Start Game
+        </button>
+        <div v-else class="game-options">
+          <button @click="continueGame" class="start-button">
+            Continue
+          </button>
+          <button @click="newGame" class="start-button">
+            New
+          </button>
+        </div>
+      </div>
+      <div v-else class="game-controls">
+        <button @click="goHome" class="home-button" title="Home">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+            <path d="M3 12L5 10M5 10L12 3L19 10M5 10V20C5 20.5523 5.44772 21 6 21H9M19 10L21 12M19 10V20C19 20.5523 18.5523 21 18 21H15M9 21C9.55228 21 10 20.5523 10 20V16C10 15.4477 10.4477 15 11 15H13C13.5523 15 14 15.4477 14 16V20C14 20.5523 14.4477 21 15 21M9 21H15"/>
+          </svg>
         </button>
       </div>
     </div>
@@ -67,9 +82,7 @@
       </div>
     </transition>
     
-    <transition name="shake">
-      <div v-if="showError" class="error-feedback"></div>
-    </transition>
+    <!-- Error feedback handled by piece animation -->
   </div>
 </template>
 
@@ -96,6 +109,7 @@ const showError = ref(false)
 const currentLevel = ref(1)
 const currentPuzzle = ref(null)
 const pieceSelected = ref(false)
+const hasActiveGame = ref(false)
 
 // Start screen animated pieces
 const startScreenPieces = ref([
@@ -139,6 +153,45 @@ const startGame = () => {
   gameStarted.value = true
   loadScore()
   nextPuzzle()
+  saveGameState()
+}
+
+const continueGame = () => {
+  const savedState = localStorage.getItem('chessGameState')
+  if (savedState) {
+    const state = JSON.parse(savedState)
+    currentLevel.value = state.level || 1
+    gameStarted.value = true
+    loadScore()
+    nextPuzzle()
+  }
+}
+
+const newGame = () => {
+  // Clear all game data
+  localStorage.removeItem('chessScore')
+  localStorage.removeItem('chessStreak')
+  localStorage.removeItem('chessGameState')
+  score.value = 0
+  streak.value = 0
+  currentLevel.value = 1
+  gameStarted.value = true
+  nextPuzzle()
+  saveGameState()
+}
+
+const goHome = () => {
+  gameStarted.value = false
+  saveGameState()
+}
+
+const saveGameState = () => {
+  const state = {
+    hasActiveGame: gameStarted.value,
+    level: currentLevel.value,
+    timestamp: Date.now()
+  }
+  localStorage.setItem('chessGameState', JSON.stringify(state))
 }
 
 const nextPuzzle = () => {
@@ -165,6 +218,9 @@ const handleSquareClick = (square) => {
   console.log('Current puzzle valid moves:', currentPuzzle.value?.allValidMoves)
   console.log('Current piece position:', currentPuzzle.value?.piecePosition)
   
+  // Check if clicking on an enemy piece
+  const isEnemySquare = currentPuzzle.value?.enemyPieces?.some(enemy => enemy.square === square)
+  
   // If piece is selected, handle the move
   if (pieceSelected.value) {
     pieceSelected.value = false // Always deselect after clicking
@@ -177,8 +233,12 @@ const handleSquareClick = (square) => {
       console.log('Valid capture move to:', square)
       playDrop()
       handleSuccess()
+    } else if (isEnemySquare) {
+      // Clicked on non-capturable enemy - show error
+      console.log('Invalid enemy capture attempted:', square)
+      handleError()
     } else {
-      // Invalid square clicked
+      // Invalid empty square clicked
       console.log('Invalid move attempted to:', square)
       console.log('Valid moves were:', currentPuzzle.value.allValidMoves)
       handleError()
@@ -225,14 +285,18 @@ const handleDragEnd = (e) => {
 const handleSquareDrop = (square) => {
   console.log('Square drop triggered on:', square)
   console.log('Valid moves:', currentPuzzle.value.allValidMoves)
-  playDrop()
+  
+  // Check if dropping on an enemy piece
+  const isEnemySquare = currentPuzzle.value?.enemyPieces?.some(enemy => enemy.square === square)
   
   // Check if the square is a valid move for this piece
   if (currentPuzzle.value.allValidMoves && currentPuzzle.value.allValidMoves.includes(square)) {
     console.log('Valid move!')
+    playDrop()
     handleSuccess()
   } else {
     console.log('Invalid move!')
+    playDrop()
     handleError()
   }
 }
@@ -257,23 +321,37 @@ const handleSuccess = () => {
     if (streak.value > 0 && streak.value % 3 === 0) {
       currentLevel.value = Math.min(currentLevel.value + 1, 10)
     }
+    saveGameState() // Save progress
     nextPuzzle()
   }, 2000)
 }
 
 const handleError = () => {
-  showError.value = true
   playError()
   resetStreak()
   saveScore()
   
-  setTimeout(() => {
-    showError.value = false
-  }, 1000)
+  // Add error animation to the piece
+  const pieceElement = document.querySelector('.piece-container')
+  if (pieceElement) {
+    pieceElement.classList.add('error-shake')
+    setTimeout(() => {
+      pieceElement.classList.remove('error-shake')
+    }, 500)
+  }
 }
 
 onMounted(() => {
   loadScore()
+  // Check for saved game state
+  const savedState = localStorage.getItem('chessGameState')
+  if (savedState) {
+    const state = JSON.parse(savedState)
+    hasActiveGame.value = state.hasActiveGame || false
+    if (state.level) {
+      currentLevel.value = state.level
+    }
+  }
   // Add event listeners for drag on board pieces
   document.addEventListener('dragstart', handleDragStart)
   document.addEventListener('dragend', handleDragEnd)
@@ -296,11 +374,16 @@ onUnmounted(() => {
   flex-direction: column;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   overflow: hidden;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh; /* Dynamic viewport height for mobile */
+  padding-bottom: 0; /* Ensure no extra padding */
 }
 
 .piece-area {
   flex: 0 0 auto;
-  min-height: 60px;
+  height: 15vh;
+  min-height: 70px;
   max-height: 100px;
   display: flex;
   justify-content: center;
@@ -308,11 +391,22 @@ onUnmounted(() => {
   background: rgba(255, 255, 255, 0.95);
   border-bottom: 2px solid #4a5568;
   position: relative;
-  padding: 8px;
+  padding: 15px 10px;
+}
+
+/* Landscape mode - reduce header height */
+@media (orientation: landscape) and (max-height: 500px) {
+  .piece-area {
+    height: 15vh;
+    min-height: 40px;
+    max-height: 60px;
+    padding: 3px;
+  }
 }
 
 @media (min-width: 768px) {
   .piece-area {
+    height: 15vh;
     min-height: 80px;
     max-height: 150px;
     padding: 10px;
@@ -344,25 +438,52 @@ onUnmounted(() => {
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 10px;
+  padding: 0;
   background: rgba(255, 255, 255, 0.9);
   overflow: hidden;
   min-height: 0;
+  position: relative;
+}
+
+/* Landscape mode adjustments */
+@media (orientation: landscape) and (max-height: 500px) {
+  .board-area {
+    padding: 0;
+    align-items: center;
+  }
+}
+
+@media (min-width: 768px) {
+  .board-area {
+    padding: 0;
+  }
 }
 
 .score-area {
+  flex: 0 0 auto;
   display: flex;
   justify-content: space-around;
   align-items: center;
-  gap: 5px;
-  background: rgba(255, 255, 255, 0.95);
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.98);
   border-top: 2px solid #4a5568;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: bold;
   color: #2d3748;
-  padding: 8px 5px;
-  flex: 0 0 auto;
-  min-height: 50px;
+  padding: 12px 10px;
+  min-height: 65px;
+  z-index: 100;
+  box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+}
+
+/* Landscape mode - more compact score area */
+@media (orientation: landscape) and (max-height: 500px) {
+  .score-area {
+    min-height: 55px;
+    padding: 8px 10px;
+    font-size: 13px;
+    flex: 0 0 auto;
+  }
 }
 
 @media (min-width: 768px) {
@@ -375,13 +496,23 @@ onUnmounted(() => {
 }
 
 .score, .streak, .level, .piece-info {
-  padding: 4px 8px;
+  padding: 10px 16px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
-  border-radius: 12px;
+  border-radius: 18px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-  font-size: 11px;
+  font-size: 15px;
   white-space: nowrap;
+  font-weight: 600;
+}
+
+/* Landscape mode - smaller score items */
+@media (orientation: landscape) and (max-height: 500px) {
+  .score, .streak, .level, .piece-info {
+    padding: 8px 12px;
+    border-radius: 14px;
+    font-size: 13px;
+  }
 }
 
 @media (min-width: 768px) {
@@ -421,6 +552,50 @@ onUnmounted(() => {
 
 .start-button:hover {
   transform: scale(1.05);
+}
+
+.game-options {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  align-items: center;
+}
+
+/* Removed separate button colors - using default purple gradient */
+
+.game-controls {
+  position: absolute;
+  top: 50%;
+  left: 15px;
+  transform: translateY(-50%);
+  z-index: 10;
+}
+
+.home-button {
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.home-button:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+}
+
+.home-button svg {
+  width: 24px;
+  height: 24px;
+  stroke: white;
+  stroke-width: 2;
+  fill: none;
 }
 
 .dancing-pieces-overlay {
@@ -489,14 +664,27 @@ onUnmounted(() => {
 }
 
 .puzzle-instructions h2 {
-  font-size: 20px;
-  margin-bottom: 5px;
+  font-size: 16px;
+  margin: 2px 0;
   color: #764ba2;
 }
 
 .puzzle-instructions p {
-  font-size: 14px;
+  font-size: 12px;
+  margin: 0;
   color: #4a5568;
+}
+
+/* Landscape mode - even smaller text */
+@media (orientation: landscape) and (max-height: 500px) {
+  .puzzle-instructions h2 {
+    font-size: 14px;
+    margin: 1px 0;
+  }
+  
+  .puzzle-instructions p {
+    font-size: 11px;
+  }
 }
 
 @media (min-width: 768px) {
@@ -572,17 +760,10 @@ onUnmounted(() => {
   animation: bounce 1s ease-in-out;
 }
 
-.error-feedback {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 200px;
-  height: 200px;
-  border: 8px solid #f56565;
-  border-radius: 20px;
-  animation: shake 0.5s;
-  z-index: 1000;
+/* Error shake animation for piece */
+:global(.error-shake) {
+  animation: piece-shake 0.5s !important;
+  filter: drop-shadow(0 0 10px rgba(239, 68, 68, 0.8)) !important;
 }
 
 @keyframes bounce {
@@ -597,15 +778,28 @@ onUnmounted(() => {
   }
 }
 
-@keyframes shake {
+@keyframes piece-shake {
   0%, 100% {
-    transform: translate(-50%, -50%) translateX(0);
+    transform: translateX(0);
   }
   10%, 30%, 50%, 70%, 90% {
-    transform: translate(-50%, -50%) translateX(-10px);
+    transform: translateX(-5px);
   }
   20%, 40%, 60%, 80% {
-    transform: translate(-50%, -50%) translateX(10px);
+    transform: translateX(5px);
+  }
+}
+
+/* Mobile optimizations for dancing pieces */
+@media (max-width: 768px) {
+  .dancing-piece {
+    width: 50px;
+    height: 50px;
+  }
+  
+  .dancing-pieces-overlay {
+    gap: 15px;
+    max-width: 280px;
   }
 }
 

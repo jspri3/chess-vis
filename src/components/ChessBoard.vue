@@ -115,6 +115,7 @@ const getSquareClass = (row, col) => {
   const hasEnemy = props.enemyPieces.some(enemy => enemy.square === square)
   const isCapturableEnemy = props.enemyPieces.some(enemy => enemy.square === square && enemy.capturable)
   const isDark = (row + col) % 2 === 1
+  const isActive = props.isDragging || props.selectedPiece
   
   return {
     'board-square': true,
@@ -125,8 +126,10 @@ const getSquareClass = (row, col) => {
     'square-start': isStart,
     'square-enemy': hasEnemy,
     'square-capturable': isCapturableEnemy,
-    'square-hoverable': isCapturableEnemy && (props.isDragging || props.selectedPiece),
-    'square-selected': isStart && props.selectedPiece
+    'square-hoverable-valid': isCapturableEnemy && isActive,
+    'square-hoverable-invalid': hasEnemy && !isCapturableEnemy && isActive,
+    'square-selected': isStart && props.selectedPiece,
+    'square-dragging': isActive
   }
 }
 
@@ -180,9 +183,12 @@ let touchItem = null
 let touchOffset = { x: 0, y: 0 }
 let dragElement = null
 
+// Track if we're using touch
+let isTouchDevice = false
+
 const handlePieceClick = (e) => {
-  // Ignore click events on touch devices (they're handled by touch events)
-  if ('ontouchstart' in window) {
+  // Ignore click events if this was from a touch
+  if (isTouchDevice) {
     return
   }
   console.log('Piece clicked!', e.target)
@@ -191,8 +197,8 @@ const handlePieceClick = (e) => {
 }
 
 const handleSquareClick = (e, row, col) => {
-  // Ignore click events on touch devices (handled by touchend)
-  if ('ontouchstart' in window) {
+  // Ignore click events if this was from a touch
+  if (isTouchDevice) {
     return
   }
   const square = getSquareNotation(row, col)
@@ -213,10 +219,8 @@ const handleSquareTouchEnd = (e, row, col) => {
 }
 
 const handleMouseDown = (e) => {
-  // Ignore mouse events on touch devices
-  if ('ontouchstart' in window) {
-    return
-  }
+  // Mark as not touch device when mouse is used
+  isTouchDevice = false
   console.log('Mouse down on piece', e.target)
 }
 
@@ -225,6 +229,7 @@ let isTouchDrag = false
 
 const handleTouchStart = (e) => {
   console.log('Touch start on piece')
+  isTouchDevice = true // Mark as touch device
   isTouchDrag = false
   
   const touch = e.touches[0]
@@ -344,12 +349,21 @@ const handleDrop = (e, row, col) => {
 <style scoped>
 .chess-board {
   display: inline-block;
-  border: 4px solid #2d3748;
-  border-radius: 12px;
+  border: 3px solid #2d3748;
+  border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
   transform: scale(1);
   transition: transform 0.3s;
+  margin: 20px;
+}
+
+@media (min-width: 768px) {
+  .chess-board {
+    border: 4px solid #2d3748;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  }
 }
 
 .board-row {
@@ -366,18 +380,40 @@ const handleDrop = (e, row, col) => {
   transition: all 0.2s;
 }
 
-/* Mobile responsive sizing */
+/* Mobile responsive sizing - make squares bigger */
 @media (max-width: 768px) {
   .board-square {
-    width: min(25vw, 12vh, 80px);
-    height: min(25vw, 12vh, 80px);
+    /* For 3x3 board on mobile, use ~30% of viewport width */
+    width: min(30vw, 18vh, 110px);
+    height: min(30vw, 18vh, 110px);
   }
 }
 
-@media (max-width: 480px) {
+/* Landscape mode on mobile */
+@media (orientation: landscape) and (max-height: 500px) {
   .board-square {
-    width: min(28vw, 10vh, 70px);
-    height: min(28vw, 10vh, 70px);
+    /* In landscape, optimize for height */
+    width: min(20vh, 20vw, 80px);
+    height: min(20vh, 20vw, 80px);
+  }
+}
+
+@media (max-width: 480px) and (orientation: portrait) {
+  .board-square {
+    /* For small phones in portrait, optimize for 3x3 board */
+    width: min(31vw, 20vh, 100px);
+    height: min(31vw, 20vh, 100px);
+  }
+}
+
+/* For 4x4 boards on mobile */
+@media (max-width: 768px) and (min-height: 700px) {
+  .board-row:first-child .board-square:nth-child(4),
+  .board-row:nth-child(2) .board-square:nth-child(4),
+  .board-row:nth-child(3) .board-square:nth-child(4),
+  .board-row:nth-child(4) .board-square:nth-child(4) {
+    width: min(23vw, 15vh, 90px);
+    height: min(23vw, 15vh, 90px);
   }
 }
 
@@ -390,8 +426,8 @@ const handleDrop = (e, row, col) => {
 }
 
 .square-invalid {
-  opacity: 0.3;
-  pointer-events: none;
+  opacity: 0.7;
+  cursor: pointer;
 }
 
 .square-valid {
@@ -410,10 +446,10 @@ const handleDrop = (e, row, col) => {
   transform: translate(-50%, -50%);
   width: 30px;
   height: 30px;
-  border: 2px solid rgba(239, 68, 68, 0.5);
+  border: 2px solid rgba(72, 187, 120, 0.6);
   border-radius: 50%;
   pointer-events: none;
-  animation: pulse-red 2s infinite;
+  animation: pulse-green 2s infinite;
 }
 
 .square-selected {
@@ -421,23 +457,46 @@ const handleDrop = (e, row, col) => {
   box-shadow: inset 0 0 0 3px rgba(72, 187, 120, 0.6);
 }
 
-@keyframes pulse-red {
+@keyframes pulse-green {
   0%, 100% {
     transform: translate(-50%, -50%) scale(1);
-    opacity: 0.5;
+    opacity: 0.6;
   }
   50% {
-    transform: translate(-50%, -50%) scale(1.1);
+    transform: translate(-50%, -50%) scale(1.2);
     opacity: 0.3;
   }
 }
 
-.square-hoverable:hover {
-  background-color: rgba(239, 68, 68, 0.2) !important;
+.square-hoverable-valid {
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.square-hoverable-valid:hover {
+  background-color: rgba(72, 187, 120, 0.3) !important;
   transform: scale(1.05);
   z-index: 1;
-  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.4);
+  box-shadow: 0 4px 16px rgba(72, 187, 120, 0.4);
+}
+
+.square-hoverable-invalid {
   cursor: pointer;
+  transition: all 0.2s;
+}
+
+.square-hoverable-invalid:hover {
+  background-color: rgba(239, 68, 68, 0.2) !important;
+  transform: scale(1.02);
+}
+
+/* Show hover effects during dragging */
+.square-dragging .square-hoverable-valid {
+  background-color: rgba(72, 187, 120, 0.2);
+}
+
+.square-dragging .square-hoverable-invalid {
+  background-color: rgba(239, 68, 68, 0.1);
 }
 
 .square-king {
