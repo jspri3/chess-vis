@@ -11,7 +11,7 @@
         </button>
         <div v-else class="game-options">
           <button @click="continueGame" class="start-button">
-            Start Game
+            {{ isMobile && hasActiveGame ? 'Start' : 'Start Game' }}
           </button>
           <button @click="newGame" class="start-button">
             New
@@ -97,7 +97,7 @@ import { useSounds } from './composables/useSounds'
 
 const { getPuzzle, generatePuzzle } = usePuzzles()
 const { score, streak, incrementScore, resetStreak, loadScore, saveScore } = useScore()
-const { playSuccess, playError, playPickup, playDrop } = useSounds()
+const { playSuccess, playError, playPickup, playDrop, initAudio } = useSounds()
 
 const gameStarted = ref(false)
 const currentPiece = ref(null)
@@ -111,6 +111,7 @@ const currentPuzzle = ref(null)
 const pieceSelected = ref(false)
 const hasActiveGame = ref(false)
 const showNewButton = ref(false)
+const isMobile = ref(false)
 
 // Start screen animated pieces
 const startScreenPieces = ref([
@@ -150,7 +151,10 @@ const getPieceImage = (piece) => {
   return `${base}assets/Piece=${pieceName}, Side=${color}.png`
 }
 
-const startGame = () => {
+const startGame = async () => {
+  // Initialize audio on user interaction (required for mobile)
+  await initAudio()
+  
   // Don't modify scores - just start/continue the game
   gameStarted.value = true
   // Don't reload scores if they're already loaded
@@ -168,12 +172,15 @@ const startGame = () => {
   saveGameState()
 }
 
-const continueGame = () => {
+const continueGame = async () => {
   // Same as startGame - just continue playing
-  startGame()
+  await startGame()
 }
 
-const newGame = () => {
+const newGame = async () => {
+  // Initialize audio on user interaction (required for mobile)
+  await initAudio()
+  
   // Clear all game data
   localStorage.removeItem('chessScore')
   localStorage.removeItem('chessStreak')
@@ -340,7 +347,15 @@ const handleError = () => {
   }
 }
 
+// Check if device is mobile based on screen width
+const checkMobile = () => {
+  isMobile.value = window.innerWidth < 768
+}
+
 onMounted(() => {
+  // Check mobile status
+  checkMobile()
+  
   // Load saved level first
   const savedState = localStorage.getItem('chessGameState')
   if (savedState) {
@@ -366,11 +381,15 @@ onMounted(() => {
   // Add event listeners for drag on board pieces
   document.addEventListener('dragstart', handleDragStart)
   document.addEventListener('dragend', handleDragEnd)
+  
+  // Add resize listener for mobile detection
+  window.addEventListener('resize', checkMobile)
 })
 
 onUnmounted(() => {
   document.removeEventListener('dragstart', handleDragStart)
   document.removeEventListener('dragend', handleDragEnd)
+  window.removeEventListener('resize', checkMobile)
 })
 </script>
 
