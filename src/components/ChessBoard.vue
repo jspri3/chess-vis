@@ -13,6 +13,7 @@
         @dragover.prevent="handleDragOver"
         @drop="handleDrop($event, rowIndex, colIndex)"
         @dragenter.prevent
+        @click="handleSquareClick($event, rowIndex, colIndex)"
       >
         <div 
           v-if="isPieceStartPosition(rowIndex, colIndex) && playerPiece"
@@ -77,10 +78,14 @@ const props = defineProps({
   playerPiece: {
     type: Object,
     default: null
+  },
+  selectedPiece: {
+    type: Boolean,
+    default: false
   }
 })
 
-const emit = defineEmits(['square-drop', 'piece-drag-start', 'piece-drag-end'])
+const emit = defineEmits(['square-drop', 'piece-drag-start', 'piece-drag-end', 'piece-select', 'square-click'])
 
 const board = computed(() => {
   const boardArray = []
@@ -119,7 +124,8 @@ const getSquareClass = (row, col) => {
     'square-start': isStart,
     'square-enemy': hasEnemy,
     'square-capturable': isCapturableEnemy,
-    'square-hoverable': isCapturableEnemy && props.isDragging
+    'square-hoverable': isCapturableEnemy && (props.isDragging || props.selectedPiece),
+    'square-selected': isStart && props.selectedPiece
   }
 }
 
@@ -175,52 +181,77 @@ let dragElement = null
 
 const handlePieceClick = (e) => {
   console.log('Piece clicked!', e.target)
+  e.stopPropagation() // Prevent square click
+  emit('piece-select')
+}
+
+const handleSquareClick = (e, row, col) => {
+  const square = getSquareNotation(row, col)
+  console.log('Square clicked:', square)
+  emit('square-click', square)
 }
 
 const handleMouseDown = (e) => {
   console.log('Mouse down on piece', e.target)
 }
 
+let touchStartPos = { x: 0, y: 0 }
+let isTouchDrag = false
+
 const handleTouchStart = (e) => {
   console.log('Touch start on piece')
+  isTouchDrag = false
+  
   const touch = e.touches[0]
   const target = e.currentTarget
   
   // Store the initial touch position
+  touchStartPos.x = touch.clientX
+  touchStartPos.y = touch.clientY
+  
   const rect = target.getBoundingClientRect()
   touchOffset.x = touch.clientX - rect.left
   touchOffset.y = touch.clientY - rect.top
-  
-  // Create a dragging element
-  dragElement = target.cloneNode(true)
-  dragElement.style.position = 'fixed'
-  dragElement.style.zIndex = '1000'
-  dragElement.style.opacity = '0.8'
-  dragElement.style.pointerEvents = 'none'
-  dragElement.style.width = rect.width + 'px'
-  dragElement.style.height = rect.height + 'px'
-  document.body.appendChild(dragElement)
-  
-  // Start dragging
-  emit('piece-drag-start', e)
-  target.style.opacity = '0.3'
 }
 
 const handleTouchMove = (e) => {
-  e.preventDefault() // Prevent scrolling
+  const touch = e.touches[0]
+  const moveDistance = Math.abs(touch.clientX - touchStartPos.x) + Math.abs(touch.clientY - touchStartPos.y)
   
-  if (dragElement) {
-    const touch = e.touches[0]
+  // If moved more than 10 pixels, it's a drag
+  if (!isTouchDrag && moveDistance > 10) {
+    isTouchDrag = true
+    const target = e.currentTarget
+    const rect = target.getBoundingClientRect()
+    
+    // Create drag element
+    dragElement = target.cloneNode(true)
+    dragElement.style.position = 'fixed'
+    dragElement.style.zIndex = '1000'
+    dragElement.style.opacity = '0.8'
+    dragElement.style.pointerEvents = 'none'
+    dragElement.style.width = rect.width + 'px'
+    dragElement.style.height = rect.height + 'px'
+    dragElement.style.left = (touch.clientX - touchOffset.x) + 'px'
+    dragElement.style.top = (touch.clientY - touchOffset.y) + 'px'
+    document.body.appendChild(dragElement)
+    
+    emit('piece-drag-start', e)
+    target.style.opacity = '0.3'
+  }
+  
+  if (dragElement && isTouchDrag) {
+    e.preventDefault() // Only prevent scrolling during drag
     dragElement.style.left = (touch.clientX - touchOffset.x) + 'px'
     dragElement.style.top = (touch.clientY - touchOffset.y) + 'px'
   }
 }
 
 const handleTouchEnd = (e) => {
-  console.log('Touch end')
+  console.log('Touch end, isTouchDrag:', isTouchDrag)
   
-  if (dragElement) {
-    // Get the element under the touch point
+  if (dragElement && isTouchDrag) {
+    // Handle drag end
     const touch = e.changedTouches[0]
     dragElement.style.display = 'none'
     const elementBelow = document.elementFromPoint(touch.clientX, touch.clientY)
@@ -241,7 +272,14 @@ const handleTouchEnd = (e) => {
     }
     
     emit('piece-drag-end', e)
+  } else {
+    // It was a tap, not a drag
+    console.log('Touch was a tap, selecting piece')
+    e.currentTarget.style.opacity = '1'
+    emit('piece-select')
   }
+  
+  isTouchDrag = false
 }
 
 const handlePieceDragStart = (e) => {
@@ -348,6 +386,11 @@ const handleDrop = (e, row, col) => {
   border-radius: 50%;
   pointer-events: none;
   animation: pulse-red 1.5s infinite;
+}
+
+.square-selected {
+  background-color: rgba(72, 187, 120, 0.3) !important;
+  box-shadow: inset 0 0 0 3px rgba(72, 187, 120, 0.6);
 }
 
 @keyframes pulse-red {

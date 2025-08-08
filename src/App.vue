@@ -21,9 +21,12 @@
         :boardDimensions="currentPuzzle?.boardDimensions || { cols: 3, rows: 3 }"
         :enemyPieces="currentPuzzle?.enemyPieces || []"
         :playerPiece="currentPiece"
+        :selectedPiece="pieceSelected"
         @square-drop="handleSquareDrop"
         @piece-drag-start="handlePieceDragStart"
         @piece-drag-end="handlePieceDragEnd"
+        @piece-select="handlePieceSelect"
+        @square-click="handleSquareClick"
         :isDragging="isDragging"
       />
       <div v-else class="start-board">
@@ -92,6 +95,7 @@ const showSuccess = ref(false)
 const showError = ref(false)
 const currentLevel = ref(1)
 const currentPuzzle = ref(null)
+const pieceSelected = ref(false)
 
 // Start screen animated pieces
 const startScreenPieces = ref([
@@ -146,10 +150,37 @@ const nextPuzzle = () => {
   console.log('Enemy pieces:', currentPuzzle.value.enemyPieces)
 }
 
+// Handle piece selection for tap-to-move
+const handlePieceSelect = () => {
+  console.log('Piece selected')
+  pieceSelected.value = !pieceSelected.value
+  if (pieceSelected.value) {
+    playPickup()
+  }
+}
+
+const handleSquareClick = (square) => {
+  console.log('Square clicked in App:', square)
+  
+  // If piece is selected and this is a valid move, make the move
+  if (pieceSelected.value) {
+    if (currentPuzzle.value.allValidMoves && currentPuzzle.value.allValidMoves.includes(square)) {
+      console.log('Making move to:', square)
+      playDrop()
+      pieceSelected.value = false
+      handleSquareDrop(square)
+    } else if (square === currentPuzzle.value.piecePosition) {
+      // Clicking on the piece again deselects it
+      pieceSelected.value = false
+    }
+  }
+}
+
 // Handle piece drag events from ChessBoard
 const handlePieceDragStart = (e) => {
   console.log('Piece drag start received in App')
   isDragging.value = true
+  pieceSelected.value = false // Cancel selection on drag
   playPickup()
   // Add dragging class to original piece
   if (e.target) {
@@ -209,6 +240,7 @@ const handleSuccess = () => {
   
   setTimeout(() => {
     showSuccess.value = false
+    pieceSelected.value = false // Reset selection
     // Progress to next level every 3 correct answers
     if (streak.value > 0 && streak.value % 3 === 0) {
       currentLevel.value = Math.min(currentLevel.value + 1, 10)
@@ -243,8 +275,11 @@ onUnmounted(() => {
 
 <style scoped>
 .game-container {
-  min-height: 100vh;
-  height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   display: flex;
   flex-direction: column;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -252,15 +287,25 @@ onUnmounted(() => {
 }
 
 .piece-area {
-  height: 15vh;
-  min-height: 80px;
+  flex: 0 0 auto;
+  min-height: 60px;
+  max-height: 100px;
   display: flex;
   justify-content: center;
   align-items: center;
   background: rgba(255, 255, 255, 0.95);
-  border-bottom: 4px solid #4a5568;
+  border-bottom: 2px solid #4a5568;
   position: relative;
-  padding: 10px;
+  padding: 8px;
+}
+
+@media (min-width: 768px) {
+  .piece-area {
+    min-height: 80px;
+    max-height: 150px;
+    padding: 10px;
+    border-bottom: 4px solid #4a5568;
+  }
 }
 
 .draggable-piece {
@@ -283,46 +328,48 @@ onUnmounted(() => {
 }
 
 .board-area {
-  flex: 1;
+  flex: 1 1 auto;
   display: flex;
   justify-content: center;
   align-items: center;
   padding: 10px;
   background: rgba(255, 255, 255, 0.9);
-  overflow: auto;
+  overflow: hidden;
   min-height: 0;
 }
 
 .score-area {
-  height: 10vh;
-  min-height: 60px;
   display: flex;
-  justify-content: center;
+  justify-content: space-around;
   align-items: center;
-  gap: 10px;
+  gap: 5px;
   background: rgba(255, 255, 255, 0.95);
-  border-top: 4px solid #4a5568;
-  font-size: 16px;
+  border-top: 2px solid #4a5568;
+  font-size: 12px;
   font-weight: bold;
   color: #2d3748;
-  flex-wrap: wrap;
-  padding: 5px;
+  padding: 8px 5px;
+  flex: 0 0 auto;
+  min-height: 50px;
 }
 
 @media (min-width: 768px) {
   .score-area {
     font-size: 24px;
     gap: 40px;
+    padding: 10px;
+    border-top: 4px solid #4a5568;
   }
 }
 
 .score, .streak, .level, .piece-info {
-  padding: 5px 10px;
+  padding: 4px 8px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
-  border-radius: 15px;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-  font-size: 14px;
+  border-radius: 12px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  font-size: 11px;
+  white-space: nowrap;
 }
 
 @media (min-width: 768px) {
@@ -330,12 +377,12 @@ onUnmounted(() => {
     padding: 10px 20px;
     border-radius: 20px;
     font-size: inherit;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
   }
 }
 
 .piece-info {
   background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
-  font-size: 16px;
 }
 
 @media (min-width: 768px) {
