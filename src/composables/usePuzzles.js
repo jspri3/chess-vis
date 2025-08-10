@@ -1,4 +1,5 @@
 import { Chess } from 'chess.js'
+import problemsData from '../assets/problems.json'
 
 export function usePuzzles() {
   
@@ -234,6 +235,11 @@ export function usePuzzles() {
   
   // Generate checkmate-in-one puzzle
   const generateCheckmatePuzzle = (level) => {
+    // For levels 5 and above, use FEN-based puzzles
+    if (level >= 5) {
+      return generateFENCheckmatePuzzle(level)
+    }
+    // For lower levels, use the simple generated puzzles
     const boardDimensions = getBoardDimensions(level)
     const { cols, rows } = boardDimensions
     const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].slice(0, cols)
@@ -358,6 +364,93 @@ export function usePuzzles() {
       boardDimensions: boardDimensions,
       puzzleType: 'checkmate',
       kingPosition: kingPosition
+    }
+  }
+  
+  // Generate FEN-based checkmate puzzle
+  const generateFENCheckmatePuzzle = (level) => {
+    // Select a random puzzle from the problems database
+    const puzzles = problemsData.problems
+    const puzzleIndex = Math.floor(Math.random() * Math.min(puzzles.length, 1000)) // Use first 1000 puzzles for now
+    const puzzle = puzzles[puzzleIndex]
+    
+    // Parse the FEN string
+    const chess = new Chess(puzzle.fen)
+    const board = chess.board()
+    
+    // Parse the solution move (e.g., "f6-g7" -> from: f6, to: g7)
+    const [from, to] = puzzle.moves.split('-')
+    
+    // Find the piece that needs to move
+    const fromSquareData = chess.get(from)
+    if (!fromSquareData) {
+      // Fallback to simple puzzle if parsing fails
+      return generateCheckmatePuzzle(4)
+    }
+    
+    // Get all pieces on the board
+    const enemyPieces = []
+    const playerPieces = []
+    
+    for (let row = 0; row < 8; row++) {
+      for (let col = 0; col < 8; col++) {
+        const piece = board[row][col]
+        if (piece) {
+          const file = String.fromCharCode(97 + col) // a-h
+          const rank = String(8 - row) // 8-1
+          const square = file + rank
+          
+          if (piece.color === 'w') {
+            if (square === from) {
+              // This is our moving piece
+              playerPieces.push({ square, piece })
+            } else {
+              // Other white pieces are helpers
+              enemyPieces.push({ 
+                square, 
+                capturable: false, 
+                isHelper: true,
+                piece: piece
+              })
+            }
+          } else {
+            // Black pieces
+            if (piece.type === 'k') {
+              // Black king
+              enemyPieces.push({ 
+                square, 
+                capturable: true, 
+                isKing: true,
+                piece: piece
+              })
+            } else {
+              // Other black pieces
+              enemyPieces.push({ 
+                square, 
+                capturable: false,
+                piece: piece
+              })
+            }
+          }
+        }
+      }
+    }
+    
+    // Get all legal moves for the piece
+    const legalMoves = chess.moves({ square: from, verbose: true })
+    const allValidMoves = legalMoves.map(m => m.to)
+    
+    return {
+      piece: { type: fromSquareData.type, color: fromSquareData.color },
+      piecePosition: from,
+      enemyPieces: enemyPieces,
+      validSquares: [to], // Only the checkmate square is valid
+      solution: to,
+      allValidMoves: allValidMoves,
+      boardDimensions: { cols: 8, rows: 8 },
+      puzzleType: 'checkmate',
+      fenPosition: puzzle.fen,
+      puzzleId: puzzle.problemid
     }
   }
   

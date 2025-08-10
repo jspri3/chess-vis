@@ -114,6 +114,7 @@ const getSquareClass = (row, col) => {
   const isStart = square === props.piecePosition
   const hasEnemy = props.enemyPieces.some(enemy => enemy.square === square)
   const isCapturableEnemy = props.enemyPieces.some(enemy => enemy.square === square && enemy.capturable)
+  const isHelper = props.enemyPieces.some(enemy => enemy.square === square && enemy.isHelper)
   const isDark = (row + col) % 2 === 1
   const isActive = props.isDragging || props.selectedPiece
   
@@ -122,12 +123,13 @@ const getSquareClass = (row, col) => {
     'square-dark': isDark,
     'square-light': !isDark,
     'square-valid': isCapturableEnemy,
-    'square-invalid': hasEnemy && !isCapturableEnemy,
+    'square-invalid': hasEnemy && !isCapturableEnemy && !isHelper,
     'square-start': isStart,
-    'square-enemy': hasEnemy,
+    'square-enemy': hasEnemy && !isHelper,
+    'square-helper': isHelper,
     'square-capturable': isCapturableEnemy,
     'square-hoverable-valid': isCapturableEnemy && isActive,
-    'square-hoverable-invalid': hasEnemy && !isCapturableEnemy && isActive,
+    'square-hoverable-invalid': hasEnemy && !isCapturableEnemy && !isHelper && isActive,
     'square-selected': isStart && props.selectedPiece,
     'square-dragging': isActive
   }
@@ -170,7 +172,22 @@ const getEnemyImage = (row, col) => {
   const enemy = props.enemyPieces.find(e => e.square === square)
   const base = import.meta.env.BASE_URL
   
-  // Check if this enemy is the king
+  // Check if this enemy has specific piece data from FEN
+  if (enemy && enemy.piece) {
+    const color = enemy.piece.color === 'w' ? 'White' : 'Black'
+    const typeMap = {
+      'q': 'Queen',
+      'r': 'Rook',
+      'b': 'Bishop',
+      'n': 'Knight',
+      'p': 'Pawn',
+      'k': 'King'
+    }
+    const pieceName = typeMap[enemy.piece.type]
+    return `${base}assets/Piece=${pieceName}, Side=${color}.png`
+  }
+  
+  // Check if this enemy is the king (for simple puzzles)
   if (enemy && enemy.isKing) {
     return `${base}assets/Piece=King, Side=Black.png`
   }
@@ -574,6 +591,15 @@ const handleDrop = (e, row, col) => {
 
 .enemy-piece {
   opacity: 0.9;
+}
+
+.square-helper {
+  opacity: 0.7;
+}
+
+.square-helper .chess-piece {
+  opacity: 0.8;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
 }
 
 @keyframes pulse {

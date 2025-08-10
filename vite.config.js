@@ -7,5 +7,16 @@ export default defineConfig(({ command }) => ({
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
+  },
+  server: {
+    hmr: {
+      overlay: true,
+      protocol: 'ws',
+      host: 'localhost'
+    },
+    watch: {
+      usePolling: true,
+      interval: 100
+    }
   }
 }))
