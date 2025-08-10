@@ -15,10 +15,9 @@ export function usePuzzles() {
     const { cols, rows } = boardDimensions
     
     // For 3x3 board, use simpler pieces
-    let pieces = ['r', 'b'] // Start with rook and bishop only for 3x3
-    if (cols > 3) pieces.push('n') // Add knight for 4x4 and larger
+    let pieces = ['r', 'b', 'n', 'p'] // Include knight for 3x3 boards too
     if (level > 3) pieces.push('q') // Add queen at level 4
-    if (level > 5) pieces.push('p') // Add pawn at level 6
+    // if (level > 5) pieces.push('p') // Add pawn at level 6
     
     const pieceType = pieces[Math.floor(Math.random() * pieces.length)]
     
@@ -28,11 +27,14 @@ export function usePuzzles() {
     // Place the player's piece appropriately
     let piecePosition
     if (cols === 3 && rows === 3) {
-      // For 3x3, avoid knight (can't move properly)
-      // Place rook/bishop in corner or edge for better moves
+      // For 3x3, place pieces strategically
       if (pieceType === 'r') {
         // Rook works well on edges
         const positions = ['a2', 'b1', 'b3', 'c2']
+        piecePosition = positions[Math.floor(Math.random() * positions.length)]
+      } else if (pieceType === 'n') {
+        // Knight can be placed anywhere except center (b2)
+        const positions = ['a1', 'a2', 'a3', 'b1', 'b3', 'c1', 'c2', 'c3']
         piecePosition = positions[Math.floor(Math.random() * positions.length)]
       } else {
         // Bishop works from center
