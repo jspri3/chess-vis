@@ -236,6 +236,8 @@ const highScore = ref(0)
 const longestStreak = ref(0)
 const hintUsed = ref(false)
 const showHint = ref(false)
+const currentMoveIndex = ref(0)
+const puzzleChess = ref(null) // Chess.js instance for multi-move puzzles
 
 // Start screen animated pieces
 const startScreenPieces = ref([
@@ -285,10 +287,24 @@ const getPuzzleDescription = () => {
     return `Use your ${pieceName} to deliver checkmate`
   }
   if (type === 'mate2') {
-    return `Find the first move in a 2-move checkmate sequence`
+    const moveNum = Math.floor(currentMoveIndex.value / 2) + 1
+    if (currentMoveIndex.value === 0) {
+      return `Find move 1 of 2 to deliver checkmate`
+    } else if (currentMoveIndex.value === 2) {
+      return `Now deliver checkmate! (Move 2 of 2)`
+    }
+    return `Opponent is thinking...`
   }
   if (type === 'mate3') {
-    return `Find the first move in a 3-move checkmate sequence`
+    const moveNum = Math.floor(currentMoveIndex.value / 2) + 1
+    if (currentMoveIndex.value === 0) {
+      return `Find move 1 of 3 to deliver checkmate`
+    } else if (currentMoveIndex.value === 2) {
+      return `Continue the attack (Move 2 of 3)`
+    } else if (currentMoveIndex.value === 4) {
+      return `Now deliver checkmate! (Move 3 of 3)`
+    }
+    return `Opponent is thinking...`
   }
   return `Move your ${pieceName}`
 }
@@ -446,6 +462,7 @@ const nextPuzzle = () => {
   // Reset hint state for new puzzle
   hintUsed.value = false
   showHint.value = false
+  currentMoveIndex.value = 0
   
   // Determine puzzle type based on level if not manually set
   let mode = puzzleType.value
@@ -460,6 +477,13 @@ const nextPuzzle = () => {
   
   currentPuzzle.value = generatePuzzle(currentLevel.value, mode)
   console.log('Generated puzzle:', currentPuzzle.value?.puzzleType, 'Board size:', `${currentPuzzle.value?.boardDimensions?.cols}x${currentPuzzle.value?.boardDimensions?.rows}`)
+  
+  // Store chess instance if it's a multi-move puzzle
+  if (currentPuzzle.value?.chess) {
+    puzzleChess.value = currentPuzzle.value.chess
+  } else {
+    puzzleChess.value = null
+  }
   
   currentPiece.value = currentPuzzle.value.piece
   validSquares.value = currentPuzzle.value.validSquares
@@ -550,9 +574,12 @@ const isValidMove = (square) => {
   if (puzzleType === 'capture') {
     // For capture puzzles, any capturable enemy is valid
     return currentPuzzle.value.validSquares && currentPuzzle.value.validSquares.includes(square)
-  } else if (puzzleType === 'checkmate' || puzzleType === 'mate1' || puzzleType === 'mate2' || puzzleType === 'mate3') {
-    // For checkmate puzzles, only the solution move is valid
+  } else if (puzzleType === 'mate1') {
+    // For mate1, only the solution move is valid
     return currentPuzzle.value.solution === square
+  } else if (puzzleType === 'mate2' || puzzleType === 'mate3') {
+    // For multi-move puzzles, check the current move in the sequence
+    return isValidMultiMove(square)
   } else if (puzzleType === 'check') {
     // For check puzzles, any move that gives check is valid
     return currentPuzzle.value.validSquares && currentPuzzle.value.validSquares.includes(square)
@@ -561,7 +588,273 @@ const isValidMove = (square) => {
   return false
 }
 
+// Handle multi-move puzzle validation and opponent responses
+const isValidMultiMove = (square) => {
+  if (!currentPuzzle.value?.moveSequence || !puzzleChess.value) return false
+  
+  const expectedMove = currentPuzzle.value.moveSequence[currentMoveIndex.value]
+  if (!expectedMove) return false
+  
+  // Parse the expected move
+  const [expectedFrom, expectedToWithPromo] = expectedMove.split('-').map(s => s.trim())
+  
+  // Strip promotion notation from expected target square
+  const expectedTo = expectedToWithPromo.length === 3 && ['q', 'r', 'b', 'n'].includes(expectedToWithPromo[2].toLowerCase())
+    ? expectedToWithPromo.substring(0, 2)
+    : expectedToWithPromo
+  
+  // Check if this is the correct move
+  const from = currentPuzzle.value.piecePosition
+  return square === expectedTo && from === expectedFrom
+}
+
+// Execute opponent's response move
+const executeOpponentMove = () => {
+  if (!currentPuzzle.value?.moveSequence || !puzzleChess.value) return
+  
+  currentMoveIndex.value++
+  
+  // Check if there's an opponent move to make
+  if (currentMoveIndex.value >= currentPuzzle.value.moveSequence.length) {
+    // Puzzle complete!
+    return true
+  }
+  
+  const opponentMove = currentPuzzle.value.moveSequence[currentMoveIndex.value]
+  const [from, toWithPromotion] = opponentMove.split('-').map(s => s.trim())
+  
+  // Check if this is a promotion move (e.g., "b1q" for promoting to queen)
+  let to = toWithPromotion
+  let promotion = undefined
+  if (toWithPromotion.length === 3) {
+    // Last character might be promotion piece
+    const lastChar = toWithPromotion[2].toLowerCase()
+    if (['q', 'r', 'b', 'n'].includes(lastChar)) {
+      to = toWithPromotion.substring(0, 2)
+      promotion = lastChar
+    }
+  }
+  
+  console.log('Opponent moves:', from, 'to', to, promotion ? `(promoting to ${promotion})` : '')
+  
+  // Make the opponent's move in the chess engine
+  try {
+    const moveOptions = { from, to }
+    if (promotion) {
+      moveOptions.promotion = promotion
+    }
+    
+    const move = puzzleChess.value.move(moveOptions)
+    if (move) {
+      // Increment move index first
+      currentMoveIndex.value++
+      
+      // Check if puzzle is complete
+      if (currentMoveIndex.value >= currentPuzzle.value.moveSequence.length) {
+        // Update board for final position
+        updateBoardFromChess()
+        return true // Puzzle complete
+      }
+      
+      // Update valid moves for the next player move
+      const nextMove = currentPuzzle.value.moveSequence[currentMoveIndex.value]
+      if (nextMove) {
+        const [nextFrom, nextToWithPromo] = nextMove.split('-').map(s => s.trim())
+        // Strip promotion from the target square for display
+        const nextTo = nextToWithPromo.length === 3 && ['q', 'r', 'b', 'n'].includes(nextToWithPromo[2].toLowerCase()) 
+          ? nextToWithPromo.substring(0, 2) 
+          : nextToWithPromo
+        
+        // Find and verify the piece exists at the expected position
+        const piece = puzzleChess.value.get(nextFrom)
+        if (piece && piece.color === 'w') {
+          // Update puzzle state with the next move requirements
+          currentPuzzle.value.piecePosition = nextFrom
+          currentPuzzle.value.solution = nextTo
+          currentPuzzle.value.piece = piece
+          currentPiece.value = piece
+          validSquares.value = [nextTo]
+          
+          // Reset interaction states for the new move
+          isDragging.value = false
+          pieceSelected.value = false
+          
+          console.log('Next move ready - Piece at:', nextFrom, 'should move to:', nextTo, 'Piece type:', piece.type)
+          
+          // Now update the board display with the correct piece position already set
+          updateBoardFromChess()
+        } else {
+          console.error('No white piece found at expected position:', nextFrom)
+          console.log('This might be okay - the piece could have moved or been captured')
+          console.log('Looking for any white piece that can move to:', nextTo)
+          
+          // Check if any white piece can legally move to nextTo
+          const legalMoves = puzzleChess.value.moves({ verbose: true })
+          const possibleMoves = legalMoves.filter(m => m.to === nextTo && m.color === 'w')
+          
+          if (possibleMoves.length > 0) {
+            // Use the first valid move (or try to match by piece type if multiple)
+            const matchingMove = possibleMoves[0]
+            console.log('Found piece that can move to', nextTo, ':', matchingMove)
+            
+            currentPuzzle.value.piecePosition = matchingMove.from
+            currentPuzzle.value.solution = matchingMove.to
+            validSquares.value = [matchingMove.to]
+            
+            const altPiece = puzzleChess.value.get(matchingMove.from)
+            if (altPiece) {
+              currentPiece.value = altPiece
+              currentPuzzle.value.piece = altPiece
+              isDragging.value = false
+              pieceSelected.value = false
+              console.log('Now using piece at', matchingMove.from, 'Type:', altPiece.type)
+            }
+          } else {
+            console.error('ERROR: No white piece can legally move to', nextTo)
+            console.log('Current position:', puzzleChess.value.ascii())
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Failed to make opponent move:', error)
+  }
+  
+  return false // Puzzle continues
+}
+
+// Update board display from chess.js state
+const updateBoardFromChess = () => {
+  if (!puzzleChess.value || !currentPuzzle.value) return
+  
+  console.log('updateBoardFromChess called, currentMoveIndex:', currentMoveIndex.value)
+  
+  const board = puzzleChess.value.board()
+  const enemyPieces = []
+  const playerPieces = []
+  
+  // Convert board to pieces arrays
+  for (let row = 0; row < 8; row++) {
+    for (let col = 0; col < 8; col++) {
+      const piece = board[row][col]
+      if (piece) {
+        const file = String.fromCharCode(97 + col)
+        const rank = String(8 - row)
+        const square = file + rank
+        
+        // Separate white (player) and black (enemy) pieces
+        if (piece.color === 'w') {
+          playerPieces.push({ square, piece })
+        } else {
+          // Black pieces are enemies
+          enemyPieces.push({
+            square,
+            piece,
+            capturable: piece.type === 'k', // Only king is capturable in checkmate puzzles
+            isKing: piece.type === 'k'
+          })
+        }
+      }
+    }
+  }
+  
+  // For multi-move puzzles, after opponent's move, identify which white piece should move next
+  const currentMoveIdx = currentMoveIndex.value || 0
+  const nextMove = currentPuzzle.value.moveSequence?.[currentMoveIdx]
+  let nextPiecePosition = currentPuzzle.value.piecePosition
+  
+  // If we have a next move in the sequence, extract the expected from square
+  if (nextMove && currentPuzzle.value.puzzleType !== 'mate1') {
+    const [expectedFrom] = nextMove.split('-').map(s => s.trim())
+    nextPiecePosition = expectedFrom
+    console.log('Next expected piece position from sequence:', expectedFrom)
+  }
+  
+  // Process all white pieces
+  for (const playerPiece of playerPieces) {
+    if (playerPiece.square === nextPiecePosition) {
+      // This is the piece that should move next - update it as the active piece
+      currentPuzzle.value.piecePosition = playerPiece.square
+      currentPuzzle.value.piece = playerPiece.piece
+      currentPiece.value = playerPiece.piece
+      console.log('Setting active piece at', playerPiece.square, 'Type:', playerPiece.piece.type)
+    } else {
+      // Other white pieces are shown as helpers (visible but not movable)
+      enemyPieces.push({
+        square: playerPiece.square,
+        piece: playerPiece.piece,
+        capturable: false,
+        isHelper: true
+      })
+    }
+  }
+  
+  currentPuzzle.value.enemyPieces = enemyPieces
+}
+
 const handleSuccess = () => {
+  // For multi-move puzzles, check if we need opponent's response
+  if ((currentPuzzle.value?.puzzleType === 'mate2' || currentPuzzle.value?.puzzleType === 'mate3') && puzzleChess.value) {
+    // Get the current move from the sequence
+    const currentMove = currentPuzzle.value.moveSequence[currentMoveIndex.value]
+    const [moveFrom, moveToWithPromo] = currentMove.split('-').map(s => s.trim())
+    
+    // Check for promotion
+    let to = moveToWithPromo
+    let promotion = undefined
+    if (moveToWithPromo.length === 3) {
+      const lastChar = moveToWithPromo[2].toLowerCase()
+      if (['q', 'r', 'b', 'n'].includes(lastChar)) {
+        to = moveToWithPromo.substring(0, 2)
+        promotion = lastChar
+      }
+    }
+    
+    // Make the player's move in the chess engine
+    const from = currentPuzzle.value.piecePosition
+    
+    try {
+      const moveOptions = { from, to }
+      if (promotion) {
+        moveOptions.promotion = promotion
+      }
+      
+      const move = puzzleChess.value.move(moveOptions)
+      if (move) {
+        console.log('Player moved:', from, 'to', to, promotion ? `(promoting to ${promotion})` : '')
+        
+        // Update board but don't change piecePosition yet
+        updateBoardFromChess()
+        
+        // Reset interaction states
+        isDragging.value = false
+        pieceSelected.value = false
+        
+        // Execute opponent's response after a short delay
+        setTimeout(() => {
+          const puzzleComplete = executeOpponentMove()
+          
+          if (puzzleComplete) {
+            // Puzzle fully completed!
+            completePuzzle()
+          } else {
+            // Continue with next move
+            playDrop()
+          }
+        }, 1000) // 1 second delay for opponent move
+      }
+    } catch (error) {
+      console.error('Failed to make player move:', error)
+      handleError()
+    }
+    return
+  }
+  
+  // For single-move puzzles, complete immediately
+  completePuzzle()
+}
+
+const completePuzzle = () => {
   showSuccess.value = true
   playSuccess()
   incrementScore()
@@ -593,6 +886,7 @@ const handleSuccess = () => {
   setTimeout(() => {
     showSuccess.value = false
     pieceSelected.value = false // Reset selection
+    currentMoveIndex.value = 0 // Reset move index
     // Progress to next level based on puzzlesPerLevel setting
     if (streak.value > 0 && streak.value % puzzlesPerLevel.value === 0) {
       currentLevel.value = Math.min(currentLevel.value + 1, 10)

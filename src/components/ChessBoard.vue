@@ -1,12 +1,21 @@
 <template>
-  <div class="chess-board" :style="boardStyle">
-    <div 
-      v-for="(row, rowIndex) in board" 
-      :key="rowIndex"
-      class="board-row"
-    >
-      <div 
-        v-for="(square, colIndex) in row"
+  <div class="chess-board-container" :style="containerStyle">
+    <div class="board-with-ranks">
+      <!-- Left rank labels (8-1) -->
+      <div class="rank-labels left">
+        <div v-for="(rank, index) in rankLabels" :key="`left-${rank}`" class="rank-label">
+          {{ rank }}
+        </div>
+      </div>
+      
+      <div class="chess-board" :style="boardStyle">
+        <div 
+          v-for="(row, rowIndex) in board" 
+          :key="rowIndex"
+          class="board-row"
+        >
+          <div 
+            v-for="(square, colIndex) in row"
         :key="`${rowIndex}-${colIndex}`"
         :class="getSquareClass(rowIndex, colIndex)"
         :data-square="getSquareNotation(rowIndex, colIndex)"
@@ -41,6 +50,16 @@
           alt="Enemy"
           class="chess-piece enemy-piece"
         />
+        </div>
+      </div>
+    </div>
+    </div>
+    
+    <!-- Bottom file labels (a-h) -->
+    <div class="file-labels bottom">
+      <div class="corner-space"></div>
+      <div v-for="(file, index) in fileLabels" :key="`bottom-${file}`" class="file-label">
+        {{ file }}
       </div>
     </div>
   </div>
@@ -109,6 +128,27 @@ const boardStyle = computed(() => ({
   '--board-cols': props.boardDimensions.cols,
   '--board-rows': props.boardDimensions.rows
 }))
+
+// Also apply the CSS variables to the container
+const containerStyle = computed(() => ({
+  '--board-cols': props.boardDimensions.cols,
+  '--board-rows': props.boardDimensions.rows
+}))
+
+// Generate file labels (a-h) based on board dimensions
+const fileLabels = computed(() => {
+  const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
+  return files.slice(0, props.boardDimensions.cols)
+})
+
+// Generate rank labels (8-1 or 4-1 etc) based on board dimensions
+const rankLabels = computed(() => {
+  const ranks = []
+  for (let i = props.boardDimensions.rows; i >= 1; i--) {
+    ranks.push(i.toString())
+  }
+  return ranks
+})
 
 const getSquareNotation = (row, col) => {
   const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].slice(0, props.boardDimensions.cols)
@@ -375,6 +415,78 @@ const handleDrop = (e, row, col) => {
 </script>
 
 <style scoped>
+.chess-board-container {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: monospace;
+}
+
+.board-with-ranks {
+  display: flex;
+  align-items: center;
+}
+
+.file-labels {
+  display: flex;
+  align-items: center;
+  font-weight: bold;
+  color: #4a5568;
+}
+
+.file-labels.bottom {
+  margin-top: 5px;
+}
+
+.file-label {
+  width: min(calc(90vw / var(--board-cols, 8)), calc(70vh / var(--board-rows, 8)), 80px);
+  text-align: center;
+  font-size: 14px;
+}
+
+.rank-labels {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  font-weight: bold;
+  color: #4a5568;
+}
+
+.rank-labels.left {
+  margin-right: 5px;
+}
+
+.rank-label {
+  height: min(calc(90vw / var(--board-cols, 8)), calc(70vh / var(--board-rows, 8)), 80px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.corner-space {
+  width: 20px;
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+  .file-label, .rank-label {
+    font-size: 12px;
+  }
+  
+  .corner-space {
+    width: 15px;
+  }
+  
+  .file-labels.bottom {
+    margin: 3px 0;
+  }
+  
+  .rank-labels.left {
+    margin: 0 3px;
+  }
+}
+
 .chess-board {
   display: inline-block;
   border: 3px solid #2d3748;
@@ -383,7 +495,6 @@ const handleDrop = (e, row, col) => {
   box-shadow: 0 4px 20px rgba(0,0,0,0.2);
   transform: scale(1);
   transition: transform 0.3s;
-  margin: 10px;
   max-width: 90vw;
   max-height: 70vh;
 }
