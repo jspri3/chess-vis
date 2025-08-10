@@ -383,11 +383,12 @@ export function usePuzzles() {
   
   // Generate checkmate puzzle
   const generateCheckmatePuzzle = (level, mateIn = 1) => {
-    // For levels 5 and above, use FEN-based puzzles
-    if (level >= 5) {
-      return generateFENCheckmatePuzzle(level)
-    }
-    // For lower levels, use the simple generated puzzles
+    // ALWAYS use FEN puzzles for any checkmate puzzle (mate1, mate2, mate3)
+    return generateFENCheckmatePuzzle(level, mateIn)
+  }
+  
+  // Old simple checkmate generator - no longer used but kept for reference
+  const generateSimpleCheckmatePuzzle = (level) => {
     const boardDimensions = getBoardDimensions(level)
     const { cols, rows } = boardDimensions
     const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].slice(0, cols)
@@ -516,33 +517,60 @@ export function usePuzzles() {
   }
   
   // Generate FEN-based checkmate puzzle
-  const generateFENCheckmatePuzzle = (level) => {
-    // Select a random puzzle from the problems database
-    const puzzles = problemsData.problems
-    const puzzleIndex = Math.floor(Math.random() * Math.min(puzzles.length, 1000)) // Use first 1000 puzzles for now
+  const generateFENCheckmatePuzzle = (level, mateIn = 1, attemptCount = 0) => {
+    // Prevent infinite recursion
+    if (attemptCount > 10) {
+      console.error('Failed to generate valid puzzle after 10 attempts')
+      // Return a basic capture puzzle as ultimate fallback
+      return generateCapturePuzzle(level)
+    }
+    
+    // Filter puzzles by type
+    let puzzleTypeName = 'Mate in One'
+    if (mateIn === 2) puzzleTypeName = 'Mate in Two'
+    else if (mateIn === 3) puzzleTypeName = 'Mate in Three'
+    
+    // Filter puzzles of the correct type
+    const allPuzzles = problemsData.problems
+    const filteredPuzzles = allPuzzles.filter(p => p.type === puzzleTypeName)
+    
+    // If no puzzles of this type, fallback to all puzzles
+    const puzzles = filteredPuzzles.length > 0 ? filteredPuzzles : allPuzzles
+    
+    // Select a random puzzle from the filtered set
+    const puzzleIndex = Math.floor(Math.random() * puzzles.length)
     const puzzle = puzzles[puzzleIndex]
+    
+    console.log('Selected puzzle ID:', puzzle.problemid, 'Type:', puzzle.type, 'First move:', puzzle.moves.split(';')[0])
     
     // Parse the FEN string
     const chess = new Chess(puzzle.fen)
     const board = chess.board()
     
-    // Parse the solution move (e.g., "d1-d8" -> from: d1, to: d8)
-    // The moves are already in lowercase format which is correct for chess.js
-    const moveParts = puzzle.moves.split('-')
+    // Parse the solution moves
+    // For Mate in 1: "f6-g7"
+    // For Mate in 2: "g4-h3;a4-a3;h3-a3" (white move, black move, white checkmate)
+    // For Mate in 3: 5 moves total (white, black, white, black, white checkmate)
+    const moveSequence = puzzle.moves.split(';').map(m => m.trim())
+    
+    // Parse the first move to set up the puzzle
+    const firstMove = moveSequence[0]
+    const moveParts = firstMove.split('-')
     if (moveParts.length !== 2) {
-      // Fallback if move format is unexpected
-      return generateCheckmatePuzzle(4)
+      console.log('Unexpected move format:', firstMove, 'from puzzle:', puzzle.moves, 'Trying another puzzle')
+      // Try another puzzle of the same type
+      return generateFENCheckmatePuzzle(level, mateIn, attemptCount + 1)
     }
     
-    const from = moveParts[0].toLowerCase()
-    const to = moveParts[1].toLowerCase()
+    const from = moveParts[0].toLowerCase().trim()
+    const to = moveParts[1].toLowerCase().trim()
     
     // Find the piece that needs to move
     const fromSquareData = chess.get(from)
     if (!fromSquareData) {
-      console.log('Failed to find piece at', from, 'in puzzle', puzzle.problemid)
-      // Fallback to simple puzzle if parsing fails
-      return generateCheckmatePuzzle(4)
+      console.log('Failed to find piece at', from, 'in puzzle', puzzle.problemid, 'Trying another puzzle')
+      // Try another puzzle of the same type
+      return generateFENCheckmatePuzzle(level, mateIn, attemptCount + 1)
     }
     
     // Get all pieces on the board
@@ -597,17 +625,25 @@ export function usePuzzles() {
     const legalMoves = chess.moves({ square: from, verbose: true })
     const allValidMoves = legalMoves.map(m => m.to)
     
+    // Determine puzzle type based on mateIn parameter
+    let puzzleType = 'mate1'
+    if (mateIn === 2) puzzleType = 'mate2'
+    else if (mateIn === 3) puzzleType = 'mate3'
+    
     return {
       piece: { type: fromSquareData.type, color: fromSquareData.color },
       piecePosition: from,
       enemyPieces: enemyPieces,
-      validSquares: [to], // Only the checkmate square is valid
+      validSquares: [to], // Only the first move target is valid
       solution: to,
       allValidMoves: allValidMoves,
       boardDimensions: { cols: 8, rows: 8 },
-      puzzleType: 'mate1',
+      puzzleType: puzzleType,
       fenPosition: puzzle.fen,
-      puzzleId: puzzle.problemid
+      puzzleId: puzzle.problemid,
+      moveSequence: moveSequence, // Full sequence of moves for mate-in-2 or mate-in-3
+      currentMoveIndex: 0, // Track which move we're on
+      chess: chess // Keep chess instance for making moves
     }
   }
   

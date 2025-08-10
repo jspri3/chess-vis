@@ -459,6 +459,8 @@ const nextPuzzle = () => {
   }
   
   currentPuzzle.value = generatePuzzle(currentLevel.value, mode)
+  console.log('Generated puzzle:', currentPuzzle.value?.puzzleType, 'Board size:', `${currentPuzzle.value?.boardDimensions?.cols}x${currentPuzzle.value?.boardDimensions?.rows}`)
+  
   currentPiece.value = currentPuzzle.value.piece
   validSquares.value = currentPuzzle.value.validSquares
   kingPosition.value = currentPuzzle.value.kingPosition
