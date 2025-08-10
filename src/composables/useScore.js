@@ -5,8 +5,8 @@ export function useScore() {
   const streak = ref(0)
   const highScore = ref(0)
   
-  const incrementScore = () => {
-    score.value += 10
+  const incrementScore = (points = 10) => {
+    score.value += points
     streak.value += 1
     if (score.value > highScore.value) {
       highScore.value = score.value

@@ -1,5 +1,5 @@
 <template>
-  <div class="chess-board">
+  <div class="chess-board" :style="boardStyle">
     <div 
       v-for="(row, rowIndex) in board" 
       :key="rowIndex"
@@ -83,6 +83,10 @@ const props = defineProps({
   selectedPiece: {
     type: Boolean,
     default: false
+  },
+  hintSquare: {
+    type: String,
+    default: null
   }
 })
 
@@ -101,6 +105,11 @@ const board = computed(() => {
   return boardArray
 })
 
+const boardStyle = computed(() => ({
+  '--board-cols': props.boardDimensions.cols,
+  '--board-rows': props.boardDimensions.rows
+}))
+
 const getSquareNotation = (row, col) => {
   const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].slice(0, props.boardDimensions.cols)
   const { rows } = props.boardDimensions
@@ -117,6 +126,7 @@ const getSquareClass = (row, col) => {
   const isHelper = props.enemyPieces.some(enemy => enemy.square === square && enemy.isHelper)
   const isDark = (row + col) % 2 === 1
   const isActive = props.isDragging || props.selectedPiece
+  const isHint = props.hintSquare === square
   
   return {
     'board-square': true,
@@ -131,7 +141,8 @@ const getSquareClass = (row, col) => {
     'square-hoverable-valid': isCapturableEnemy && isActive,
     'square-hoverable-invalid': hasEnemy && !isCapturableEnemy && !isHelper && isActive,
     'square-selected': isStart && props.selectedPiece,
-    'square-dragging': isActive
+    'square-dragging': isActive,
+    'square-hint': isHint
   }
 }
 
@@ -372,7 +383,9 @@ const handleDrop = (e, row, col) => {
   box-shadow: 0 4px 20px rgba(0,0,0,0.2);
   transform: scale(1);
   transition: transform 0.3s;
-  margin: 20px;
+  margin: 10px;
+  max-width: 90vw;
+  max-height: 70vh;
 }
 
 @media (min-width: 768px) {
@@ -388,8 +401,8 @@ const handleDrop = (e, row, col) => {
 }
 
 .board-square {
-  width: min(15vw, 15vh, 120px);
-  height: min(15vw, 15vh, 120px);
+  width: min(calc(90vw / var(--board-cols, 8)), calc(70vh / var(--board-rows, 8)), 80px);
+  height: min(calc(90vw / var(--board-cols, 8)), calc(70vh / var(--board-rows, 8)), 80px);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -397,12 +410,11 @@ const handleDrop = (e, row, col) => {
   transition: all 0.2s;
 }
 
-/* Mobile responsive sizing - make squares bigger */
+/* Mobile responsive sizing - adapt to board dimensions */
 @media (max-width: 768px) {
   .board-square {
-    /* For 3x3 board on mobile, use ~30% of viewport width */
-    width: min(30vw, 18vh, 110px);
-    height: min(30vw, 18vh, 110px);
+    width: min(calc(85vw / var(--board-cols, 8)), calc(60vh / var(--board-rows, 8)), 70px);
+    height: min(calc(85vw / var(--board-cols, 8)), calc(60vh / var(--board-rows, 8)), 70px);
   }
 }
 
@@ -410,27 +422,24 @@ const handleDrop = (e, row, col) => {
 @media (orientation: landscape) and (max-height: 500px) {
   .board-square {
     /* In landscape, optimize for height */
-    width: min(20vh, 20vw, 80px);
-    height: min(20vh, 20vw, 80px);
+    width: min(calc(80vw / var(--board-cols, 8)), calc(65vh / var(--board-rows, 8)), 60px);
+    height: min(calc(80vw / var(--board-cols, 8)), calc(65vh / var(--board-rows, 8)), 60px);
   }
 }
 
 @media (max-width: 480px) and (orientation: portrait) {
   .board-square {
-    /* For small phones in portrait, optimize for 3x3 board */
-    width: min(31vw, 20vh, 100px);
-    height: min(31vw, 20vh, 100px);
+    /* For small phones in portrait, adapt to board dimensions */
+    width: min(calc(85vw / var(--board-cols, 8)), calc(55vh / var(--board-rows, 8)), 65px);
+    height: min(calc(85vw / var(--board-cols, 8)), calc(55vh / var(--board-rows, 8)), 65px);
   }
 }
 
-/* For 4x4 boards on mobile */
-@media (max-width: 768px) and (min-height: 700px) {
-  .board-row:first-child .board-square:nth-child(4),
-  .board-row:nth-child(2) .board-square:nth-child(4),
-  .board-row:nth-child(3) .board-square:nth-child(4),
-  .board-row:nth-child(4) .board-square:nth-child(4) {
-    width: min(23vw, 15vh, 90px);
-    /* height removed to fix white square issue */
+/* Desktop sizing for larger boards */
+@media (min-width: 769px) {
+  .board-square {
+    width: min(calc(80vw / var(--board-cols, 8)), calc(65vh / var(--board-rows, 8)), 90px);
+    height: min(calc(80vw / var(--board-cols, 8)), calc(65vh / var(--board-rows, 8)), 90px);
   }
 }
 
@@ -472,6 +481,41 @@ const handleDrop = (e, row, col) => {
 .square-selected {
   background-color: rgba(72, 187, 120, 0.3) !important;
   box-shadow: inset 0 0 0 3px rgba(72, 187, 120, 0.6);
+}
+
+.square-hint {
+  animation: hint-pulse 1s ease-in-out infinite;
+  position: relative;
+}
+
+.square-hint::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle, rgba(255, 215, 0, 0.6) 0%, rgba(255, 215, 0, 0) 70%);
+  pointer-events: none;
+  animation: hint-glow 1s ease-in-out infinite;
+}
+
+@keyframes hint-pulse {
+  0%, 100% {
+    box-shadow: inset 0 0 0 3px rgba(255, 215, 0, 0.8);
+  }
+  50% {
+    box-shadow: inset 0 0 0 6px rgba(255, 215, 0, 0.4);
+  }
+}
+
+@keyframes hint-glow {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 @keyframes pulse-green {

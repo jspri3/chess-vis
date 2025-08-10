@@ -10,11 +10,17 @@ export function usePuzzles() {
     return { cols: 8, rows: 4 } // 4x8 for levels 7+
   }
   
-  // Generate capture puzzle - place enemy pieces and find which ones can be captured
+  // Generate puzzle based on type
   const generatePuzzle = (level, mode = 'capture') => {
     // Route to appropriate puzzle generator
-    if (mode === 'checkmate') {
-      return generateCheckmatePuzzle(level)
+    if (mode === 'checkmate' || mode === 'mate1') {
+      return generateCheckmatePuzzle(level, 1)
+    } else if (mode === 'mate2') {
+      return generateCheckmatePuzzle(level, 2)
+    } else if (mode === 'mate3') {
+      return generateCheckmatePuzzle(level, 3)
+    } else if (mode === 'check') {
+      return generateCheckPuzzle(level)
     }
     return generateCapturePuzzle(level)
   }
@@ -199,6 +205,21 @@ export function usePuzzles() {
         }
         break
         
+      case 'k': // King - one square in any direction
+        const kingMoves = [
+          [-1, -1], [-1, 0], [-1, 1],
+          [0, -1],           [0, 1],
+          [1, -1],  [1, 0],  [1, 1]
+        ]
+        for (const [df, dr] of kingMoves) {
+          const newFile = fileIndex + df
+          const newRank = rankIndex + dr
+          if (newFile >= 0 && newFile < files.length && newRank >= 0 && newRank < ranks.length) {
+            attacks.push(`${files[newFile]}${ranks[newRank]}`)
+          }
+        }
+        break
+        
       case 'q': // Queen - combination of rook and bishop
         // Horizontal
         for (let i = 0; i < files.length; i++) {
@@ -233,8 +254,135 @@ export function usePuzzles() {
     return attacks
   }
   
-  // Generate checkmate-in-one puzzle
-  const generateCheckmatePuzzle = (level) => {
+  // Generate check puzzle - piece needs to move to give check
+  const generateCheckPuzzle = (level) => {
+    const boardDimensions = getBoardDimensions(level)
+    const { cols, rows } = boardDimensions
+    const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].slice(0, cols)
+    const ranks = ['1', '2', '3', '4'].slice(0, rows)
+    
+    // Choose a piece type
+    let pieces = ['r', 'b', 'n']
+    if (level > 2) pieces.push('q')
+    const pieceType = pieces[Math.floor(Math.random() * pieces.length)]
+    
+    // Place the enemy king randomly
+    const kingFile = files[Math.floor(Math.random() * files.length)]
+    const kingRank = ranks[Math.floor(Math.random() * ranks.length)]
+    const kingPosition = `${kingFile}${kingRank}`
+    
+    // Find a starting position where the piece does NOT check the king
+    let piecePosition = null
+    let checkSquares = []
+    const allSquares = []
+    
+    for (const file of files) {
+      for (const rank of ranks) {
+        const square = `${file}${rank}`
+        if (square !== kingPosition) {
+          allSquares.push(square)
+        }
+      }
+    }
+    
+    // Find a position where piece doesn't attack the king
+    const nonCheckPositions = allSquares.filter(sq => {
+      const attacks = getAttackSquares(pieceType, sq, boardDimensions)
+      return !attacks.includes(kingPosition)
+    })
+    
+    if (nonCheckPositions.length === 0) {
+      // Fallback to capture puzzle if no valid position
+      return generateCapturePuzzle(level)
+    }
+    
+    piecePosition = nonCheckPositions[Math.floor(Math.random() * nonCheckPositions.length)]
+    
+    // Now find all squares from where this piece CAN check the king
+    for (const square of allSquares) {
+      if (square === piecePosition) continue
+      const attacks = getAttackSquares(pieceType, square, boardDimensions)
+      if (attacks.includes(kingPosition)) {
+        // Make sure the king can't capture the piece if it moves here
+        const kingAttacks = getAttackSquares('k', kingPosition, boardDimensions)
+        if (!kingAttacks.includes(square)) {
+          checkSquares.push(square)
+        }
+      }
+    }
+    
+    if (checkSquares.length === 0) {
+      // No valid check positions, fallback to capture
+      return generateCapturePuzzle(level)
+    }
+    
+    // Add some blocking pieces for higher levels
+    const enemyPieces = []
+    if (level > 3 && cols > 3) {
+      const numBlockers = Math.min(level - 3, 2)
+      const placedSquares = [kingPosition, piecePosition]
+      
+      for (let i = 0; i < numBlockers && placedSquares.length < allSquares.length; i++) {
+        const availableSquares = allSquares.filter(sq => 
+          !placedSquares.includes(sq) && !checkSquares.includes(sq)
+        )
+        if (availableSquares.length > 0) {
+          const blockerSquare = availableSquares[Math.floor(Math.random() * availableSquares.length)]
+          enemyPieces.push({ square: blockerSquare, capturable: false, isBlocker: true })
+          placedSquares.push(blockerSquare)
+        }
+      }
+    }
+    
+    // Add the king
+    enemyPieces.push({ square: kingPosition, capturable: false, isKing: true })
+    
+    // Pick one check square as the solution
+    const solution = checkSquares[Math.floor(Math.random() * checkSquares.length)]
+    
+    return {
+      piece: { type: pieceType, color: 'w' },
+      piecePosition: piecePosition,
+      enemyPieces: enemyPieces,
+      validSquares: checkSquares, // All squares that give check
+      solution: solution,
+      allValidMoves: checkSquares,
+      boardDimensions: boardDimensions,
+      puzzleType: 'check',
+      kingPosition: kingPosition
+    }
+  }
+  
+  // Get king attack squares (for check validation)
+  const getKingAttackSquares = (fromSquare, boardDimensions) => {
+    const { cols, rows } = boardDimensions
+    const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].slice(0, cols)
+    const ranks = ['1', '2', '3', '4'].slice(0, rows)
+    const attacks = []
+    
+    const fileIndex = files.indexOf(fromSquare[0])
+    const rankIndex = ranks.indexOf(fromSquare[1])
+    
+    // King moves one square in any direction
+    const kingMoves = [
+      [-1, -1], [-1, 0], [-1, 1],
+      [0, -1],           [0, 1],
+      [1, -1],  [1, 0],  [1, 1]
+    ]
+    
+    for (const [df, dr] of kingMoves) {
+      const newFile = fileIndex + df
+      const newRank = rankIndex + dr
+      if (newFile >= 0 && newFile < files.length && newRank >= 0 && newRank < ranks.length) {
+        attacks.push(`${files[newFile]}${ranks[newRank]}`)
+      }
+    }
+    
+    return attacks
+  }
+  
+  // Generate checkmate puzzle
+  const generateCheckmatePuzzle = (level, mateIn = 1) => {
     // For levels 5 and above, use FEN-based puzzles
     if (level >= 5) {
       return generateFENCheckmatePuzzle(level)
@@ -358,11 +506,11 @@ export function usePuzzles() {
       piece: { type: pieceType, color: 'w' },
       piecePosition: piecePosition,
       enemyPieces: enemyPieces,
-      validSquares: validSquares,
+      validSquares: [checkmateSquare], // Only the checkmate square is valid
       solution: checkmateSquare,
       allValidMoves: validMoves,
       boardDimensions: boardDimensions,
-      puzzleType: 'checkmate',
+      puzzleType: 'mate1',
       kingPosition: kingPosition
     }
   }
@@ -378,12 +526,21 @@ export function usePuzzles() {
     const chess = new Chess(puzzle.fen)
     const board = chess.board()
     
-    // Parse the solution move (e.g., "f6-g7" -> from: f6, to: g7)
-    const [from, to] = puzzle.moves.split('-')
+    // Parse the solution move (e.g., "d1-d8" -> from: d1, to: d8)
+    // The moves are already in lowercase format which is correct for chess.js
+    const moveParts = puzzle.moves.split('-')
+    if (moveParts.length !== 2) {
+      // Fallback if move format is unexpected
+      return generateCheckmatePuzzle(4)
+    }
+    
+    const from = moveParts[0].toLowerCase()
+    const to = moveParts[1].toLowerCase()
     
     // Find the piece that needs to move
     const fromSquareData = chess.get(from)
     if (!fromSquareData) {
+      console.log('Failed to find piece at', from, 'in puzzle', puzzle.problemid)
       // Fallback to simple puzzle if parsing fails
       return generateCheckmatePuzzle(4)
     }
@@ -448,7 +605,7 @@ export function usePuzzles() {
       solution: to,
       allValidMoves: allValidMoves,
       boardDimensions: { cols: 8, rows: 8 },
-      puzzleType: 'checkmate',
+      puzzleType: 'mate1',
       fenPosition: puzzle.fen,
       puzzleId: puzzle.problemid
     }
