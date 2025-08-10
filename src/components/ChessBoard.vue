@@ -37,7 +37,7 @@
         </div>
         <img 
           v-if="hasEnemyPiece(rowIndex, colIndex)"
-          :src="getEnemyImage()"
+          :src="getEnemyImage(rowIndex, colIndex)"
           alt="Enemy"
           class="chess-piece enemy-piece"
         />
@@ -165,8 +165,17 @@ const getPieceImage = (piece) => {
   return `${base}assets/Piece=${pieceName}, Side=${color}.png`
 }
 
-const getEnemyImage = () => {
+const getEnemyImage = (row, col) => {
+  const square = getSquareNotation(row, col)
+  const enemy = props.enemyPieces.find(e => e.square === square)
   const base = import.meta.env.BASE_URL
+  
+  // Check if this enemy is the king
+  if (enemy && enemy.isKing) {
+    return `${base}assets/Piece=King, Side=Black.png`
+  }
+  
+  // Default to pawn for other enemies
   return `${base}assets/Piece=Pawn, Side=Black.png`
 }
 

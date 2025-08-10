@@ -10,7 +10,16 @@ export function usePuzzles() {
   }
   
   // Generate capture puzzle - place enemy pieces and find which ones can be captured
-  const generatePuzzle = (level) => {
+  const generatePuzzle = (level, mode = 'capture') => {
+    // Route to appropriate puzzle generator
+    if (mode === 'checkmate') {
+      return generateCheckmatePuzzle(level)
+    }
+    return generateCapturePuzzle(level)
+  }
+  
+  // Generate capture puzzle - place enemy pieces and find which ones can be captured
+  const generateCapturePuzzle = (level) => {
     const boardDimensions = getBoardDimensions(level)
     const { cols, rows } = boardDimensions
     
@@ -221,6 +230,135 @@ export function usePuzzles() {
     }
     
     return attacks
+  }
+  
+  // Generate checkmate-in-one puzzle
+  const generateCheckmatePuzzle = (level) => {
+    const boardDimensions = getBoardDimensions(level)
+    const { cols, rows } = boardDimensions
+    const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].slice(0, cols)
+    const ranks = ['1', '2', '3', '4'].slice(0, rows)
+    
+    // Start simple - just place king and one attacking piece
+    let pieces = ['r', 'q'] // Start with rook and queen for simple checkmates
+    if (level > 2) pieces.push('b', 'n') // Add bishop and knight for variety
+    
+    const pieceType = pieces[Math.floor(Math.random() * pieces.length)]
+    
+    // Place the enemy king in a corner or edge (easier to checkmate)
+    let kingPosition
+    if (cols === 3 && rows === 3) {
+      // Corner positions for 3x3
+      const corners = ['a1', 'a3', 'c1', 'c3']
+      kingPosition = corners[Math.floor(Math.random() * corners.length)]
+    } else {
+      // Edge/corner positions for larger boards
+      const edgePositions = []
+      // Add corners
+      edgePositions.push(`${files[0]}${ranks[0]}`)
+      edgePositions.push(`${files[0]}${ranks[ranks.length-1]}`)
+      edgePositions.push(`${files[files.length-1]}${ranks[0]}`)
+      edgePositions.push(`${files[files.length-1]}${ranks[ranks.length-1]}`)
+      // Add some edge positions
+      if (cols > 3) {
+        edgePositions.push(`${files[Math.floor(cols/2)]}${ranks[0]}`)
+        edgePositions.push(`${files[Math.floor(cols/2)]}${ranks[ranks.length-1]}`)
+      }
+      kingPosition = edgePositions[Math.floor(Math.random() * edgePositions.length)]
+    }
+    
+    // Find good position for attacking piece to deliver checkmate
+    let piecePosition = null
+    let checkmateSquare = null
+    const allSquares = []
+    
+    for (const file of files) {
+      for (const rank of ranks) {
+        const square = `${file}${rank}`
+        if (square !== kingPosition) {
+          allSquares.push(square)
+        }
+      }
+    }
+    
+    // Try to find a position that can deliver checkmate
+    for (const square of allSquares) {
+      const attacks = getAttackSquares(pieceType, square, boardDimensions)
+      if (attacks.includes(kingPosition)) {
+        // Check if this would be checkmate (king can't escape)
+        // For simplicity, place piece where it attacks the king
+        // and the king has limited escape squares
+        piecePosition = square
+        checkmateSquare = kingPosition
+        break
+      }
+    }
+    
+    // If no direct checkmate found, place piece to attack near king
+    if (!piecePosition) {
+      // Place piece at a strategic distance
+      if (pieceType === 'r') {
+        // Rook - same file or rank as king
+        const kingFile = files.indexOf(kingPosition[0])
+        const kingRank = ranks.indexOf(kingPosition[1])
+        if (Math.random() < 0.5) {
+          // Same file, different rank
+          const newRank = kingRank === 0 ? ranks.length - 1 : 0
+          piecePosition = `${files[kingFile]}${ranks[newRank]}`
+        } else {
+          // Same rank, different file
+          const newFile = kingFile === 0 ? files.length - 1 : 0
+          piecePosition = `${files[newFile]}${ranks[kingRank]}`
+        }
+      } else if (pieceType === 'q') {
+        // Queen - diagonal or straight from king
+        const centerFile = Math.floor(cols/2)
+        const centerRank = Math.floor(rows/2)
+        piecePosition = `${files[centerFile]}${ranks[centerRank]}`
+      } else {
+        // Bishop or Knight - place near center
+        const centerFile = Math.floor(cols/2)
+        const centerRank = Math.floor(rows/2)
+        piecePosition = `${files[centerFile]}${ranks[centerRank]}`
+      }
+      checkmateSquare = kingPosition
+    }
+    
+    // Add supporting pieces for higher levels
+    const enemyPieces = []
+    if (level > 3 && cols > 3) {
+      // Add a few blocking pieces to make it more interesting
+      const numBlockers = Math.min(level - 3, 2)
+      const placedSquares = [kingPosition, piecePosition]
+      
+      for (let i = 0; i < numBlockers && placedSquares.length < allSquares.length; i++) {
+        const availableSquares = allSquares.filter(sq => !placedSquares.includes(sq))
+        if (availableSquares.length > 0) {
+          const blockerSquare = availableSquares[Math.floor(Math.random() * availableSquares.length)]
+          enemyPieces.push({ square: blockerSquare, capturable: false, isBlocker: true })
+          placedSquares.push(blockerSquare)
+        }
+      }
+    }
+    
+    // The king is always shown as enemy piece
+    enemyPieces.push({ square: kingPosition, capturable: true, isKing: true })
+    
+    // All squares that attack the king are valid moves
+    const validMoves = getAttackSquares(pieceType, piecePosition, boardDimensions)
+    const validSquares = validMoves.filter(sq => sq === kingPosition)
+    
+    return {
+      piece: { type: pieceType, color: 'w' },
+      piecePosition: piecePosition,
+      enemyPieces: enemyPieces,
+      validSquares: validSquares,
+      solution: checkmateSquare,
+      allValidMoves: validMoves,
+      boardDimensions: boardDimensions,
+      puzzleType: 'checkmate',
+      kingPosition: kingPosition
+    }
   }
   
   return {

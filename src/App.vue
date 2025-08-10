@@ -2,8 +2,8 @@
   <div class="game-container">
     <div class="piece-area">
       <div v-if="gameStarted && currentPuzzle" class="puzzle-instructions">
-        <h2>Capture the enemy pieces!</h2>
-        <p>Drag your {{ getPieceName(currentPiece) }} to capture the highlighted enemies</p>
+        <h2>{{ captureKingMode ? 'Checkmate the King!' : 'Capture the enemy pieces!' }}</h2>
+        <p>{{ captureKingMode ? `Use your ${getPieceName(currentPiece)} to checkmate the king` : `Drag your ${getPieceName(currentPiece)} to capture the highlighted enemies` }}</p>
       </div>
       <div v-if="!gameStarted" class="start-message">
         <button v-if="!hasActiveGame" @click="startGame" class="start-button">
@@ -16,6 +16,13 @@
           <button @click="newGame" class="start-button">
             New
           </button>
+        </div>
+        <div class="game-mode-settings">
+          <label class="mode-toggle">
+            <input type="checkbox" v-model="captureKingMode" @change="saveSettings">
+            <span class="toggle-slider"></span>
+            <span class="mode-label">{{ captureKingMode ? 'Capture the King' : 'Capture Enemy Pieces' }}</span>
+          </label>
         </div>
       </div>
       <div v-else class="game-controls">
@@ -112,6 +119,7 @@ const pieceSelected = ref(false)
 const hasActiveGame = ref(false)
 const showNewButton = ref(false)
 const isMobile = ref(false)
+const captureKingMode = ref(false)
 
 // Start screen animated pieces
 const startScreenPieces = ref([
@@ -215,8 +223,24 @@ const saveGameState = () => {
   localStorage.setItem('chessGameState', JSON.stringify(state))
 }
 
+const saveSettings = () => {
+  const settings = {
+    captureKingMode: captureKingMode.value
+  }
+  localStorage.setItem('chessSettings', JSON.stringify(settings))
+}
+
+const loadSettings = () => {
+  const savedSettings = localStorage.getItem('chessSettings')
+  if (savedSettings) {
+    const settings = JSON.parse(savedSettings)
+    captureKingMode.value = settings.captureKingMode || false
+  }
+}
+
 const nextPuzzle = () => {
-  currentPuzzle.value = generatePuzzle(currentLevel.value)
+  const mode = captureKingMode.value ? 'checkmate' : 'capture'
+  currentPuzzle.value = generatePuzzle(currentLevel.value, mode)
   currentPiece.value = currentPuzzle.value.piece
   validSquares.value = currentPuzzle.value.validSquares
   kingPosition.value = currentPuzzle.value.kingPosition
@@ -356,6 +380,9 @@ onMounted(() => {
   // Check mobile status
   checkMobile()
   
+  // Load settings
+  loadSettings()
+  
   // Load saved level first
   const savedState = localStorage.getItem('chessGameState')
   if (savedState) {
@@ -412,9 +439,9 @@ onUnmounted(() => {
 
 .piece-area {
   flex: 0 0 auto;
-  height: 15vh;
-  min-height: 70px;
-  max-height: 100px;
+  height: auto;
+  min-height: 100px;
+  max-height: 200px;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -566,6 +593,10 @@ onUnmounted(() => {
 
 .start-message {
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
 }
 
 .start-button {
@@ -856,5 +887,75 @@ onUnmounted(() => {
 
 .feedback-enter-from, .feedback-leave-to {
   opacity: 0;
+}
+
+/* Game mode settings */
+.game-mode-settings {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+}
+
+.mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  user-select: none;
+  padding: 10px 20px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 25px;
+  transition: background 0.3s;
+}
+
+.mode-toggle:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.mode-toggle input {
+  display: none;
+}
+
+.toggle-slider {
+  position: relative;
+  width: 50px;
+  height: 26px;
+  background: #ccc;
+  border-radius: 34px;
+  transition: background-color 0.3s;
+}
+
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  left: 2px;
+  top: 2px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.3s;
+}
+
+.mode-toggle input:checked + .toggle-slider {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.mode-toggle input:checked + .toggle-slider::before {
+  transform: translateX(24px);
+}
+
+.mode-label {
+  font-size: 16px;
+  font-weight: 600;
+  color: #4a5568;
+  min-width: 180px;
+  text-align: left;
+}
+
+@media (min-width: 768px) {
+  .mode-label {
+    font-size: 18px;
+  }
 }
 </style>
